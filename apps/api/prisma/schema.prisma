@@ -1,0 +1,308 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- User & Organization Management ---
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  passwordHash String? // Nullable if using OAuth only
+  name         String?
+  avatarUrl    String?
+  role         GlobalRole @default(USER) // USER, SUPER_ADMIN
+  createdAt    DateTime   @default(now())
+
+  memberships WorkspaceMember[]
+
+  @@index([email])
+}
+
+model Workspace {
+  id   String   @id @default(uuid())
+  name String
+  slug String   @unique // For URL routing
+  plan PlanType @default(FREE) // FREE, PRO, ENTERPRISE
+
+  // Billing (Razorpay)
+  razorpaySubscriptionId String?
+  razorpayCustomerId     String?
+
+  members      WorkspaceMember[]
+  channels     Channel[]
+  flows        Flow[]
+  contacts     Contact[]
+  tags         Tag[]
+  customFields CustomField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole // OWNER, ADMIN, EDITOR, AGENT
+
+  user      User      @relation(fields: [userId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+// --- Integration Layer (Omnichannel) ---
+
+model Channel {
+  id          String      @id @default(uuid())
+  workspaceId String
+  type        ChannelType // INSTAGRAM, WHATSAPP, EMAIL
+  name        String // e.g. "Main Insta", "Support WhatsApp"
+
+  // Provider specific config (Tokens, Page IDs, Phone Numbers, SMTP)
+  // Encrypted at application layer
+  config Json
+
+  isActive Boolean @default(true)
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  conversations   Conversation[]
+  contactChannels ContactChannel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+// --- Automation Engine ---
+
+model Flow {
+  id          String      @id @default(uuid())
+  workspaceId String
+  name        String
+  channelType ChannelType // Limit flow to specific channel type
+  triggerType TriggerType // KEYWORD, COMMENT, STORY_REPLY, WELCOME
+  keywords    String[] // Array of keywords if triggerType is KEYWORD
+  isActive    Boolean     @default(false)
+
+  nodes Json // React Flow Nodes (UI State)
+  edges Json // React Flow Edges (UI State)
+
+  // Compiled logic for faster execution
+  executionGraph Json?
+
+  stats FlowStats?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([isActive])
+}
+
+model FlowStats {
+  id        String @id @default(uuid())
+  flowId    String @unique
+  triggered Int    @default(0)
+  completed Int    @default(0)
+  clicks    Int    @default(0)
+
+  flow Flow @relation(fields: [flowId], references: [id])
+}
+
+// --- CRM & Messaging ---
+
+model Contact {
+  id          String @id @default(uuid())
+  workspaceId String
+
+  // Unified Profile
+  fullName      String?
+  email         String?
+  phone         String?
+  profilePicUrl String?
+
+  // Custom Data
+  customData Json? // Key-value pairs for Custom Fields
+  tags       ContactTag[]
+
+  // Channels this contact is reachable on
+  channels      ContactChannel[]
+  conversations Conversation[]
+
+  lastInteractionAt DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, phone])
+  @@index([workspaceId, lastInteractionAt])
+}
+
+model ContactChannel {
+  id        String @id @default(uuid())
+  contactId String
+  channelId String
+
+  // The platform-specific ID (PSID for Insta, WAID for WhatsApp, Email for Email)
+  externalId String
+
+  // Channel specific metadata (e.g. "Can Message?", "Window Open?")
+  metadata Json?
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  @@unique([channelId, externalId]) // Unique user per channel
+  @@index([contactId])
+}
+
+model Tag {
+  id          String @id @default(uuid())
+  workspaceId String
+  name        String
+
+  contacts  ContactTag[]
+  workspace Workspace    @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, name])
+}
+
+model ContactTag {
+  contactId  String
+  tagId      String
+  assignedAt DateTime @default(now())
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  tag     Tag     @relation(fields: [tagId], references: [id])
+
+  @@id([contactId, tagId])
+}
+
+model CustomField {
+  id          String    @id @default(uuid())
+  workspaceId String
+  key         String
+  name        String
+  type        FieldType // TEXT, NUMBER, BOOLEAN, DATE
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, key])
+}
+
+model Conversation {
+  id          String     @id @default(uuid())
+  workspaceId String
+  channelId   String
+  contactId   String
+  status      ConvStatus @default(OPEN) // OPEN, CLOSED, SNOOZED
+
+  messages Message[]
+
+  contact Contact @relation(fields: [contactId], references: [id])
+  channel Channel @relation(fields: [channelId], references: [id])
+
+  updatedAt DateTime @updatedAt // Sort by recent activity
+
+  @@index([workspaceId, status])
+  @@index([contactId])
+  @@index([channelId])
+}
+
+model Message {
+  id             String     @id @default(uuid())
+  conversationId String
+  sender         SenderType // USER, BOT, AGENT
+
+  // Content
+  contentType ContentType @default(TEXT) // TEXT, IMAGE, TEMPLATE
+  content     String? // Text content or Template Name
+  mediaUrl    String? // Image/Video URL
+
+  // Platform Metadata
+  externalId String? // Message ID from provider (deduplication)
+  metadata   Json? // Template params, Quick replies, etc.
+
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+}
+
+// --- Enums ---
+
+enum GlobalRole {
+  USER
+  SUPER_ADMIN
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  AGENT
+}
+
+enum PlanType {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum ChannelType {
+  INSTAGRAM
+  WHATSAPP
+  EMAIL
+}
+
+enum TriggerType {
+  KEYWORD
+  COMMENT
+  STORY_REPLY
+  WELCOME
+  DEFAULT_REPLY
+  NEW_SUBSCRIBER // Email specific
+}
+
+enum FieldType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  DATE
+}
+
+enum ConvStatus {
+  OPEN
+  CLOSED
+  SNOOZED
+}
+
+enum SenderType {
+  USER
+  BOT
+  AGENT
+}
+
+enum ContentType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  TEMPLATE // WhatsApp Templates
+}
