@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const axiosInstance = axios.create({
-    baseURL: "http://localhost:3001",
+    baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
     withCredentials: true, // Important for cookies
 });
 
@@ -39,7 +39,7 @@ axiosInstance.interceptors.response.use(
 
             try {
                 const { data } = await axios.post(
-                    "http://localhost:3001/auth/refresh",
+                    `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/auth/refresh`,
                     {},
                     { withCredentials: true }
                 );
