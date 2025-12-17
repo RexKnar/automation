@@ -16,7 +16,7 @@ import { UsersModule } from './users/users.module';
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot([{
-      ttl: 60000,
+      ttl: 60,
       limit: 10,
     }]),
     AuthModule,
