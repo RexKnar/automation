@@ -76,7 +76,7 @@ export default function EditAutomationPage() {
             keywordType: data.keywordType,
             keywords: data.keywordType === 'specific' ? data.keywords : [],
             postId: data.triggerType === 'specific' ? data.selectedMediaId : null
-          }
+          } as any
         }
       ];
 
@@ -88,7 +88,7 @@ export default function EditAutomationPage() {
           data: {
             label: 'Reply to Comment',
             replies: data.replies
-          }
+          } as any
         });
       }
 
@@ -101,7 +101,7 @@ export default function EditAutomationPage() {
             label: 'Opening DM',
             content: data.openingDMText,
             buttons: [{ label: data.replyButtonText, action: 'next_step' }]
-          }
+          } as any
         });
       }
 
@@ -113,7 +113,7 @@ export default function EditAutomationPage() {
           data: {
             label: 'Link DM',
             content: `${data.dmLinkText}\n${data.linkUrl}`
-          }
+          } as any
         });
       }
 

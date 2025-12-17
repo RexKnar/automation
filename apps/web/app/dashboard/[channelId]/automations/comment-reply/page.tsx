@@ -37,7 +37,7 @@ export default function CommentReplyPage() {
             keywordType: data.keywordType,
             keywords: data.keywordType === 'specific' ? data.keywords : [],
             postId: data.triggerType === 'specific' ? data.selectedMediaId : null
-          }
+          } as any
         }
       ];
 
@@ -50,7 +50,7 @@ export default function CommentReplyPage() {
           data: {
             label: 'Reply to Comment',
             replies: data.replies
-          }
+          } as any
         });
       }
 
@@ -64,7 +64,7 @@ export default function CommentReplyPage() {
             label: 'Opening DM',
             content: data.openingDMText,
             buttons: [{ label: data.replyButtonText, action: 'next_step' }]
-          }
+          } as any
         });
       }
 
@@ -76,7 +76,7 @@ export default function CommentReplyPage() {
           data: {
             label: 'Link DM',
             content: `${data.dmLinkText}\n${data.linkUrl}`
-          }
+          } as any
         });
       }
 
