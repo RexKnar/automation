@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { AppModule } from './app.module';
+import { AppModule } from '../src/app.module';
 import express from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
@@ -18,7 +18,7 @@ const createNestServer = async (expressInstance) => {
     app.use(cookieParser());
 
     app.enableCors({
-        origin: 'http://localhost:3000', // Update this with your production frontend URL
+        origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
         credentials: true,
     });
 
