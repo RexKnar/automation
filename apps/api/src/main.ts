@@ -10,9 +10,23 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
 
+  const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.NEXT_PUBLIC_FRONTEND_URL,
+    'http://localhost:3000'
+  ].filter(Boolean).map(origin => origin?.replace(/\/$/, ''));
+
   app.enableCors({
-    origin: 'http://localhost:3000', // Frontend URL
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization',
   });
 
   app.useGlobalPipes(new ValidationPipe({

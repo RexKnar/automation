@@ -17,9 +17,25 @@ const createNestServer = async (expressInstance) => {
     app.use(helmet());
     app.use(cookieParser());
 
+    const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        process.env.NEXT_PUBLIC_FRONTEND_URL,
+        'http://localhost:3000',
+        'https://automation-docs.vercel.app'
+    ].filter(Boolean).map(origin => origin?.replace(/\/$/, '')); // Remove trailing slashes
+
     app.enableCors({
-        origin: process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:3000',
+        origin: (requestOrigin, callback) => {
+            if (!requestOrigin || allowedOrigins.includes(requestOrigin)) {
+                callback(null, true);
+            } else {
+                console.log('Blocked CORS origin:', requestOrigin);
+                callback(null, false); // Or callback(new Error('Not allowed by CORS'))
+            }
+        },
         credentials: true,
+        methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+        allowedHeaders: 'Content-Type, Accept, Authorization',
     });
 
     app.useGlobalPipes(new ValidationPipe({
