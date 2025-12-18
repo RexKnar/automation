@@ -292,7 +292,10 @@ export class AutomationService {
         }
 
         const accessToken = (channel.config as any).accessToken;
-        const pageId = (channel.config as any).metaBusinessId; // Or retrieve from /me/accounts if not stored
+        const pageId = (channel.config as any).metaBusinessId;
+
+        console.log(`[Automation] Debug - PageID: ${pageId}`);
+        console.log(`[Automation] Debug - AccessToken (first 10 chars): ${accessToken ? accessToken.substring(0, 10) : 'MISSING'}`);
 
         // 2. Send Message via Graph API
         try {

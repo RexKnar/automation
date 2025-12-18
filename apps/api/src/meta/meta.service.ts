@@ -137,6 +137,23 @@ export class MetaService {
     }
 
     async saveMetaTokens(userId: string, accessToken: string, expiresIn: number, metaBusinessId?: string) {
+        // If metaBusinessId is not provided, fetch it
+        if (!metaBusinessId) {
+            try {
+                const pagesResponse = await firstValueFrom(
+                    this.http.get(`https://graph.facebook.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
+                        headers: { Authorization: `Bearer ${accessToken}` }
+                    })
+                );
+                const page = pagesResponse.data.data.find((p: any) => p.instagram_business_account);
+                if (page && page.instagram_business_account) {
+                    metaBusinessId = page.instagram_business_account.id;
+                }
+            } catch (error) {
+                console.error('Failed to fetch Instagram Business Account ID:', error);
+            }
+        }
+
         // Find workspace where user is OWNER
         const workspaceMember = await (this.prisma as any).workspaceMember.findFirst({
             where: { userId, role: 'OWNER' },
