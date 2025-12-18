@@ -16,7 +16,7 @@ export class MetaService {
 
     getAuthUrl(state: string): string {
         const appId = this.config.get<string>('META_APP_ID');
-        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'http://localhost:3001/meta/callback';
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
         const scope = 'instagram_basic,instagram_manage_messages,pages_manage_metadata,pages_read_engagement,pages_show_list,business_management';
 
         if (!appId) {
@@ -29,7 +29,7 @@ export class MetaService {
     async exchangeCodeForToken(code: string) {
         const appId = this.config.get<string>('META_APP_ID');
         const appSecret = this.config.get<string>('META_APP_SECRET');
-        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'http://localhost:3001/meta/callback';
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
 
         if (!appId || !appSecret) {
             throw new InternalServerErrorException('Meta credentials not configured');
