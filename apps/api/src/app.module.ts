@@ -18,8 +18,8 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot({
       throttlers: [{
         name: 'default',
-        ttl: 60000,
-        limit: Number.MAX_SAFE_INTEGER,
+        ttl: 60,
+        limit: 999999,
       }],
 
     }),
