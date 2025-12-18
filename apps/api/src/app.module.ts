@@ -18,7 +18,7 @@ import { UsersModule } from './users/users.module';
     ThrottlerModule.forRoot({
       throttlers: [{
         name: 'default',
-        ttl: 60,
+        ttl: 60000,
         limit: 1000,
       }],
 
