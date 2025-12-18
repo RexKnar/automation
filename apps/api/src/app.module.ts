@@ -21,10 +21,6 @@ import { UsersModule } from './users/users.module';
         ttl: 600,
         limit: 1000,
       }],
-      skipIf: (context) => {
-        const request = context.switchToHttp().getRequest();
-        return request.path.startsWith('/meta/webhook');
-      },
     }),
     AuthModule,
     WorkspacesModule,
