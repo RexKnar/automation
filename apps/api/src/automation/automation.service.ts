@@ -293,6 +293,7 @@ export class AutomationService {
 
         const accessToken = (channel.config as any).accessToken;
         const pageId = (channel.config as any).metaBusinessId;
+        console.log(`[Automation] channel Details`, (channel.config as any));
 
         console.log(`[Automation] Debug - PageID: ${pageId}`);
         console.log(`[Automation] Debug - AccessToken (first 10 chars): ${accessToken ? accessToken.substring(0, 10) : 'MISSING'}`);
@@ -316,7 +317,7 @@ export class AutomationService {
             };
 
             await firstValueFrom(this.http.post(url, payload, {
-                headers: { Authorization: `Bearer EAARy66pJoOcBQNFoj1mV2wqskDpfp2JeGcTtWZBovZABAykGqUFeNEZCfS8eN3YCdTtUZBfDMAim3oaZCiYjIxUsL9b2RVVLGhLHTy7KYRhZBAOy9ge9Oed8NBDd48FoVpLlb28hD53V44bOxKu5mt4oaV2KNDK7QZAekqIKviJop7SeCftZBb5pCZB8wTwZBgJy9ZAPHjfNWQH8uisuAU7nuZBTiV2ZCUbMJiEfEpRig2zvZCdx8yZBkeVQZBCZBGR2IZAly4bN4u9ZCxZByNNavsIhexbzrRq37hfL` }
+                headers: { Authorization: `Bearer ${accessToken}` }
             }));
             console.log(`[Automation] Message sent successfully to ${context.contactId}`);
 
