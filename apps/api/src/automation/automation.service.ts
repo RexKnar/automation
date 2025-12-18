@@ -147,7 +147,7 @@ export class AutomationService {
                 },
             });
 
-            await this.triggerFlow(flow.id, data.fromId);
+            await this.triggerFlow(flow.id, data.fromId, { commentId: data.commentId });
         }
     }
 
@@ -218,7 +218,7 @@ export class AutomationService {
         return true;
     }
 
-    async triggerFlow(flowId: string, contactId: string) {
+    async triggerFlow(flowId: string, contactId: string, metadata?: any) {
         const flow = await this.getFlow(flowId);
         const nodes = flow.nodes as unknown as FlowNode[];
 
@@ -230,7 +230,7 @@ export class AutomationService {
             workspaceId: flow.workspaceId,
             contactId,
             flowId,
-            variables: {},
+            variables: metadata || {},
         };
 
         await this.executeNode(startNode, context, nodes, flow.edges as any);
@@ -296,16 +296,24 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.facebook.com/v24.0/me/messages?access_token=${accessToken}`;
+            const url = `https://graph.instagram.com/v24.0/${pageId}/messages`;
 
             // Construct payload based on node content
-            // Simple text message for now
+            let recipient: any = { id: context.contactId };
+
+            // Handle Private Reply (if commentId exists in context)
+            if (context.variables && context.variables.commentId) {
+                recipient = { comment_id: context.variables.commentId };
+            }
+
             const payload = {
-                recipient: { id: context.contactId },
+                recipient,
                 message: { text: node.data.content },
             };
 
-            await firstValueFrom(this.http.post(url, payload));
+            await firstValueFrom(this.http.post(url, payload, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            }));
             console.log(`[Automation] Message sent successfully to ${context.contactId}`);
 
             await this.prisma.automationLog.create({
