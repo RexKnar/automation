@@ -15,24 +15,24 @@ export class MetaService {
     ) { }
 
     getAuthUrl(state: string): string {
-        const appId = this.config.get<string>('META_APP_ID');
+        const appId = this.config.get<string>('INSTAGRAM_APP_ID');
         const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
         const scope = 'instagram_business_basic,instagram_manage_comments,instagram_manage_messages';
 
         if (!appId) {
-            throw new InternalServerErrorException('META_APP_ID not configured');
+            throw new InternalServerErrorException('INSTAGRAM_APP_ID not configured');
         }
 
         return `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
     }
 
     async exchangeCodeForToken(code: string) {
-        const appId = this.config.get<string>('META_APP_ID');
-        const appSecret = this.config.get<string>('META_APP_SECRET');
+        const appId = this.config.get<string>('INSTAGRAM_APP_ID');
+        const appSecret = this.config.get<string>('INSTAGRAM_APP_SECRET');
         const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
 
         if (!appId || !appSecret) {
-            throw new InternalServerErrorException('Meta credentials not configured');
+            throw new InternalServerErrorException('Instagram credentials not configured');
         }
 
         try {
