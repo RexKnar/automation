@@ -21,6 +21,7 @@ import { UsersModule } from './users/users.module';
         ttl: 600,
         limit: 1000,
       }],
+
     }),
     AuthModule,
     WorkspacesModule,
