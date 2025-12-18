@@ -17,13 +17,13 @@ export class MetaService {
     getAuthUrl(state: string): string {
         const appId = this.config.get<string>('META_APP_ID');
         const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
-        const scope = 'instagram_basic,instagram_manage_messages,pages_manage_metadata,pages_read_engagement,pages_show_list,business_management';
+        const scope = 'instagram_business_basic,instagram_manage_comments,instagram_manage_messages';
 
         if (!appId) {
             throw new InternalServerErrorException('META_APP_ID not configured');
         }
 
-        return `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${scope}`;
+        return `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
     }
 
     async exchangeCodeForToken(code: string) {
@@ -36,15 +36,15 @@ export class MetaService {
         }
 
         try {
+            const formData = new URLSearchParams();
+            formData.append('client_id', appId);
+            formData.append('client_secret', appSecret);
+            formData.append('grant_type', 'authorization_code');
+            formData.append('redirect_uri', redirectUri);
+            formData.append('code', code);
+
             const { data } = await firstValueFrom(
-                this.http.get('https://graph.facebook.com/v24.0/oauth/access_token', {
-                    params: {
-                        client_id: appId,
-                        client_secret: appSecret,
-                        redirect_uri: redirectUri,
-                        code,
-                    },
-                }),
+                this.http.post('https://api.instagram.com/oauth/access_token', formData)
             );
             return data;
         } catch (error) {
@@ -107,7 +107,7 @@ export class MetaService {
             // 1. Get the Instagram Business Account ID
             // We first get the user's pages, then the connected IG account
             const pagesResponse = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
+                this.http.get(`https://graph.instagram.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
@@ -123,7 +123,7 @@ export class MetaService {
 
             // 2. Fetch Media
             const mediaResponse = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v24.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
+                this.http.get(`https://graph.instagram.com/v24.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
@@ -137,20 +137,28 @@ export class MetaService {
     }
 
     async saveMetaTokens(userId: string, accessToken: string, expiresIn: number, metaBusinessId?: string) {
+        console.log(`[MetaService] Saving tokens for user ${userId}. Initial metaBusinessId: ${metaBusinessId}`);
+
         // If metaBusinessId is not provided, fetch it
         if (!metaBusinessId) {
             try {
+                console.log('[MetaService] Fetching Instagram Business Account ID...');
                 const pagesResponse = await firstValueFrom(
-                    this.http.get(`https://graph.facebook.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
+                    this.http.get(`https://graph.instagram.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
                     })
                 );
+                console.log('[MetaService] Pages response:', JSON.stringify(pagesResponse.data));
+
                 const page = pagesResponse.data.data.find((p: any) => p.instagram_business_account);
                 if (page && page.instagram_business_account) {
                     metaBusinessId = page.instagram_business_account.id;
+                    console.log(`[MetaService] Found metaBusinessId: ${metaBusinessId}`);
+                } else {
+                    console.warn('[MetaService] No Instagram Business Account found in pages response.');
                 }
             } catch (error) {
-                console.error('Failed to fetch Instagram Business Account ID:', error);
+                console.error('Failed to fetch Instagram Business Account ID:', error?.response?.data || error.message);
             }
         }
 
@@ -174,7 +182,7 @@ export class MetaService {
             let channelName = 'Instagram Account';
             try {
                 const { data: metaUser } = await firstValueFrom(
-                    this.http.get(`https://graph.facebook.com/v24.0/me?fields=name`, {
+                    this.http.get(`https://graph.instagram.com/v24.0/me?fields=name`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
                     })
                 );
@@ -205,7 +213,7 @@ export class MetaService {
         let channelName = 'Instagram Account';
         try {
             const { data: metaUser } = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v24.0/me?fields=name`, {
+                this.http.get(`https://graph.instagram.com/v24.0/me?fields=name`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );

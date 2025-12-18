@@ -44,7 +44,7 @@ export class MetaController {
             const userId = userIdStr;
 
             const tokenData = await this.metaService.exchangeCodeForToken(code);
-            await this.metaService.saveMetaTokens(userId, tokenData.access_token, tokenData.expires_in);
+            await this.metaService.saveMetaTokens(userId, tokenData.access_token, tokenData.expires_in, tokenData.user_id);
 
             res.redirect(`${process.env.FRONTEND_URL}/dashboard/connect/instagram?status=success`);
         } catch (error) {
