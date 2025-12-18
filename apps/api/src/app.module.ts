@@ -17,9 +17,11 @@ import { UsersModule } from './users/users.module';
     ConfigModule.forRoot({ isGlobal: true }),
     ThrottlerModule.forRoot({
       throttlers: [{
+        name: 'default',
         ttl: 600,
         limit: 1000,
       }],
+
     }),
     AuthModule,
     WorkspacesModule,
