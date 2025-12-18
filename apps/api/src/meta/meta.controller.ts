@@ -17,6 +17,7 @@ import { AtGuard } from '../common/guards';
 import { GetCurrentUser } from '../common/decorators';
 import { randomBytes } from 'crypto';
 import { Public } from '../common/decorators';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('meta')
 @UseGuards(AtGuard)
@@ -85,6 +86,7 @@ export class MetaController {
 
     @Get('webhook')
     @Public()
+    @SkipThrottle()
     verifyWebhook(
         @Query('hub.mode') mode: string,
         @Query('hub.verify_token') token: string,
@@ -95,6 +97,7 @@ export class MetaController {
 
     @Post('webhook')
     @Public()
+    @SkipThrottle()
     @HttpCode(HttpStatus.OK)
     async handleWebhook(@Body() body: any) {
         return this.metaService.processWebhook(body);
