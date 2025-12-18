@@ -40,10 +40,10 @@ export class GoogleController {
             const tokenData = await this.googleService.exchangeCodeForToken(code);
 
             // Stubbed logic
-            res.redirect('http://localhost:3000/dashboard/business?status=google_connected');
+            res.redirect(`${process.env.FRONTEND_URL}/dashboard/business?status=google_connected`);
         } catch (error) {
             console.error('Google OAuth callback error:', error);
-            res.redirect('http://localhost:3000/dashboard/business?status=google_error');
+            res.redirect(`${process.env.FRONTEND_URL}/dashboard/business?status=google_error`);
         }
     }
 

@@ -45,10 +45,10 @@ export class MetaController {
             const tokenData = await this.metaService.exchangeCodeForToken(code);
             await this.metaService.saveMetaTokens(userId, tokenData.access_token, tokenData.expires_in);
 
-            res.redirect('http://localhost:3000/dashboard/connect/instagram?status=success');
+            res.redirect(`${process.env.FRONTEND_URL}/dashboard/connect/instagram?status=success`);
         } catch (error) {
             console.error('Meta OAuth callback error:', error);
-            res.redirect('http://localhost:3000/dashboard/connect/instagram?status=error');
+            res.redirect(`${process.env.FRONTEND_URL}/dashboard/connect/instagram?status=error`);
         }
     }
 
