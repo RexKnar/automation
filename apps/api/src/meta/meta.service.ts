@@ -37,7 +37,7 @@ export class MetaService {
 
         try {
             const { data } = await firstValueFrom(
-                this.http.get('https://graph.instagram.com/v24.0/oauth/access_token', {
+                this.http.get('https://graph.facebook.com/v24.0/oauth/access_token', {
                     params: {
                         client_id: appId,
                         client_secret: appSecret,
@@ -107,7 +107,7 @@ export class MetaService {
             // 1. Get the Instagram Business Account ID
             // We first get the user's pages, then the connected IG account
             const pagesResponse = await firstValueFrom(
-                this.http.get(`https://graph.instagram.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
+                this.http.get(`https://graph.facebook.com/v24.0/me/accounts?fields=instagram_business_account,name`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
@@ -123,7 +123,7 @@ export class MetaService {
 
             // 2. Fetch Media
             const mediaResponse = await firstValueFrom(
-                this.http.get(`https://graph.instagram.com/v24.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
+                this.http.get(`https://graph.facebook.com/v24.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
@@ -157,7 +157,7 @@ export class MetaService {
             let channelName = 'Instagram Account';
             try {
                 const { data: metaUser } = await firstValueFrom(
-                    this.http.get(`https://graph.instagram.com/v24.0/me?fields=name`, {
+                    this.http.get(`https://graph.facebook.com/v24.0/me?fields=name`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
                     })
                 );
@@ -188,7 +188,7 @@ export class MetaService {
         let channelName = 'Instagram Account';
         try {
             const { data: metaUser } = await firstValueFrom(
-                this.http.get(`https://graph.instagram.com/v24.0/me?fields=name`, {
+                this.http.get(`https://graph.facebook.com/v24.0/me?fields=name`, {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
