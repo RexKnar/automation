@@ -19,7 +19,7 @@ import { UsersModule } from './users/users.module';
       throttlers: [{
         name: 'default',
         ttl: 60000,
-        limit: 1000,
+        limit: Number.MAX_SAFE_INTEGER,
       }],
 
     }),
