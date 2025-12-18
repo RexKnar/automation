@@ -23,7 +23,7 @@ export class MetaService {
             throw new InternalServerErrorException('META_APP_ID not configured');
         }
 
-        return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${scope}`;
+        return `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&scope=${scope}`;
     }
 
     async exchangeCodeForToken(code: string) {
@@ -37,7 +37,7 @@ export class MetaService {
 
         try {
             const { data } = await firstValueFrom(
-                this.http.get('https://graph.facebook.com/v18.0/oauth/access_token', {
+                this.http.get('https://graph.facebook.com/v24.0/oauth/access_token', {
                     params: {
                         client_id: appId,
                         client_secret: appSecret,
@@ -107,7 +107,7 @@ export class MetaService {
             // 1. Get the Instagram Business Account ID
             // We first get the user's pages, then the connected IG account
             const pagesResponse = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account,name&access_token=${accessToken}`)
+                this.http.get(`https://graph.facebook.com/v24.0/me/accounts?fields=instagram_business_account,name&access_token=${accessToken}`)
             );
 
             const page = pagesResponse.data.data.find((p: any) => p.instagram_business_account);
@@ -121,7 +121,7 @@ export class MetaService {
 
             // 2. Fetch Media
             const mediaResponse = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v18.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}&access_token=${accessToken}`)
+                this.http.get(`https://graph.facebook.com/v24.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}&access_token=${accessToken}`)
             );
 
             return mediaResponse.data.data || [];
@@ -153,7 +153,7 @@ export class MetaService {
             let channelName = 'Instagram Account';
             try {
                 const { data: metaUser } = await firstValueFrom(
-                    this.http.get(`https://graph.facebook.com/v18.0/me?fields=name&access_token=${accessToken}`)
+                    this.http.get(`https://graph.facebook.com/v24.0/me?fields=name&access_token=${accessToken}`)
                 );
                 if (metaUser && metaUser.name) {
                     channelName = metaUser.name;
@@ -182,7 +182,7 @@ export class MetaService {
         let channelName = 'Instagram Account';
         try {
             const { data: metaUser } = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v18.0/me?fields=name&access_token=${accessToken}`)
+                this.http.get(`https://graph.facebook.com/v24.0/me?fields=name&access_token=${accessToken}`)
             );
             if (metaUser && metaUser.name) {
                 channelName = metaUser.name;
@@ -229,7 +229,9 @@ export class MetaService {
             for (const entry of body.entry) {
                 for (const messaging of entry.messaging || []) {
                     // Handle Messages (DM)
-                    // await this.handleInstagramMessage(messaging);
+                    if (messaging.message && !messaging.message.is_echo) {
+                        await this.handleInstagramMessage(messaging);
+                    }
                 }
 
                 for (const change of entry.changes || []) {
@@ -253,6 +255,21 @@ export class MetaService {
             commentId: comment.id,
             fromId: comment.from.id,
             fromUsername: comment.from.username,
+        });
+    }
+
+    private async handleInstagramMessage(messaging: any) {
+        console.log('Processing Message:', messaging);
+        // messaging structure: { sender: { id }, recipient: { id }, timestamp, message: { mid, text } }
+
+        if (!messaging.message || !messaging.message.text) {
+            return;
+        }
+
+        await this.automationService.handleIncomingMessage({
+            text: messaging.message.text,
+            messageId: messaging.message.mid,
+            fromId: messaging.sender.id,
         });
     }
 

@@ -151,6 +151,57 @@ export class AutomationService {
         }
     }
 
+    async handleIncomingMessage(data: {
+        text: string;
+        messageId: string;
+        fromId: string;
+    }) {
+        console.log(`[Automation] Handling Message from ${data.fromId}: "${data.text}"`);
+
+        // 1. Find all active flows triggered by KEYWORD
+        const potentialFlows = await this.prisma.flow.findMany({
+            where: {
+                isActive: true,
+                triggerType: 'KEYWORD',
+            },
+        });
+
+        console.log(`[Automation] Found ${potentialFlows.length} active keyword flows.`);
+
+        for (const flow of potentialFlows) {
+            const nodes = flow.nodes as unknown as FlowNode[];
+            const triggerNode = nodes.find(n => n.type === 'TRIGGER');
+
+            if (!triggerNode) continue;
+
+            // Check Keywords
+            const keywords = triggerNode.data.keywords || [];
+            const messageText = data.text.toLowerCase();
+
+            const hasKeyword = keywords.some((k: string) => messageText.includes(k.toLowerCase()));
+
+            if (!hasKeyword && keywords.length > 0) {
+                continue;
+            }
+
+            // Match Found! Trigger Flow
+            console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
+
+            await this.prisma.automationLog.create({
+                data: {
+                    flowId: flow.id,
+                    workspaceId: flow.workspaceId,
+                    triggerType: 'KEYWORD',
+                    status: 'TRIGGERED',
+                    message: `Triggered by message from ${data.fromId}`,
+                    metadata: data,
+                },
+            });
+
+            await this.triggerFlow(flow.id, data.fromId);
+        }
+    }
+
     async processTrigger(workspaceId: string, trigger: { type: 'KEYWORD' | 'COMMENT' | 'STORY_REPLY' | 'WELCOME' | 'DEFAULT_REPLY' | 'NEW_SUBSCRIBER', keyword?: string, contactId: string }) {
         const flow = await this.prisma.flow.findFirst({
             where: {
@@ -245,7 +296,7 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${accessToken}`;
+            const url = `https://graph.facebook.com/v24.0/me/messages?access_token=${accessToken}`;
 
             // Construct payload based on node content
             // Simple text message for now
