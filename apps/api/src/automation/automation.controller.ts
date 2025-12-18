@@ -56,4 +56,8 @@ export class AutomationController {
     ) {
         return this.automationService.triggerFlow(id, body.contactId);
     }
+    @Get('logs/:flowId')
+    getLogs(@Param('flowId') flowId: string) {
+        return this.automationService.getLogs(flowId);
+    }
 }

@@ -42,6 +42,7 @@ model Workspace {
   contacts     Contact[]
   tags         Tag[]
   customFields CustomField[]
+  logs         AutomationLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -102,6 +103,7 @@ model Flow {
   executionGraph Json?
 
   stats FlowStats?
+  logs  AutomationLog[]
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -120,6 +122,23 @@ model FlowStats {
   clicks    Int    @default(0)
 
   flow Flow @relation(fields: [flowId], references: [id])
+}
+
+model AutomationLog {
+  id          String   @id @default(uuid())
+  flowId      String?
+  workspaceId String?
+  triggerType String
+  status      String
+  message     String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  flow      Flow?      @relation(fields: [flowId], references: [id])
+
+  @@index([workspaceId])
+  @@index([flowId])
 }
 
 // --- CRM & Messaging ---

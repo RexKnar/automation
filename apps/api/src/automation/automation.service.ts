@@ -1,10 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
+import { firstValueFrom } from 'rxjs';
 import { FlowGraph, ExecutionContext, FlowNode } from './types/flow.types';
 
 @Injectable()
 export class AutomationService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private http: HttpService,
+        private config: ConfigService,
+    ) { }
 
     async createFlow(userId: string, data: {
         name: string;
@@ -66,6 +73,14 @@ export class AutomationService {
         });
     }
 
+    async getLogs(flowId: string) {
+        return this.prisma.automationLog.findMany({
+            where: { flowId },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        });
+    }
+
     // --- Execution Engine ---
 
     async handleIncomingComment(data: {
@@ -120,6 +135,18 @@ export class AutomationService {
 
             // Match Found! Trigger Flow
             console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
+
+            await this.prisma.automationLog.create({
+                data: {
+                    flowId: flow.id,
+                    workspaceId: flow.workspaceId,
+                    triggerType: 'COMMENT',
+                    status: 'TRIGGERED',
+                    message: `Triggered by comment from ${data.fromUsername}`,
+                    metadata: data,
+                },
+            });
+
             await this.triggerFlow(flow.id, data.fromId);
         }
     }
@@ -195,7 +222,64 @@ export class AutomationService {
     }
 
     private async sendMessage(node: FlowNode, context: ExecutionContext) {
-        // Placeholder for sending message via Meta API
-        console.log(`[Mock] Sending Message: "${node.data.content}" to ${context.contactId}`);
+        console.log(`[Automation] Sending Message: "${node.data.content}" to ${context.contactId}`);
+
+        // 1. Get Channel Access Token
+        // We assume the flow is associated with a specific channel type (INSTAGRAM)
+        // In a real scenario, we might want to pass the specific channel ID in the context or flow
+        const channel = await this.prisma.channel.findFirst({
+            where: {
+                workspaceId: context.workspaceId,
+                type: 'INSTAGRAM',
+                isActive: true,
+            },
+        });
+
+        if (!channel || !channel.config || !(channel.config as any).accessToken) {
+            console.error(`[Automation] No active Instagram channel found for workspace ${context.workspaceId}`);
+            return;
+        }
+
+        const accessToken = (channel.config as any).accessToken;
+        const pageId = (channel.config as any).metaBusinessId; // Or retrieve from /me/accounts if not stored
+
+        // 2. Send Message via Graph API
+        try {
+            const url = `https://graph.facebook.com/v18.0/me/messages?access_token=${accessToken}`;
+
+            // Construct payload based on node content
+            // Simple text message for now
+            const payload = {
+                recipient: { id: context.contactId },
+                message: { text: node.data.content },
+            };
+
+            await firstValueFrom(this.http.post(url, payload));
+            console.log(`[Automation] Message sent successfully to ${context.contactId}`);
+
+            await this.prisma.automationLog.create({
+                data: {
+                    flowId: context.flowId,
+                    workspaceId: context.workspaceId,
+                    triggerType: 'ACTION',
+                    status: 'SUCCESS',
+                    message: `Sent DM to ${context.contactId}`,
+                    metadata: { nodeId: node.id, content: node.data.content },
+                },
+            });
+        } catch (error) {
+            console.error(`[Automation] Failed to send message:`, error?.response?.data || error.message);
+
+            await this.prisma.automationLog.create({
+                data: {
+                    flowId: context.flowId,
+                    workspaceId: context.workspaceId,
+                    triggerType: 'ACTION',
+                    status: 'FAILED',
+                    message: `Failed to send DM to ${context.contactId}`,
+                    metadata: { error: error?.response?.data || error.message },
+                },
+            });
+        }
     }
 }
