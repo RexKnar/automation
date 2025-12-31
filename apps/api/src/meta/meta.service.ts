@@ -16,7 +16,7 @@ export class MetaService {
 
     getAuthUrl(state: string): string {
         const appId = this.config.get<string>('FACEBOOK_APP_ID');
-        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'http://localhost:3001/meta/callback';
         const scope = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement,business_management';
 
         if (!appId) {
@@ -29,7 +29,7 @@ export class MetaService {
     async exchangeCodeForToken(code: string) {
         const appId = this.config.get<string>('FACEBOOK_APP_ID');
         const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
-        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'http://localhost:3001/meta/callback';
 
         if (!appId || !appSecret) {
             throw new InternalServerErrorException('Facebook credentials not configured');
