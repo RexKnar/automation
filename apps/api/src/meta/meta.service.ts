@@ -15,36 +15,36 @@ export class MetaService {
     ) { }
 
     getAuthUrl(state: string): string {
-        const appId = this.config.get<string>('INSTAGRAM_APP_ID');
+        const appId = this.config.get<string>('FACEBOOK_APP_ID');
         const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
-        const scope = 'instagram_business_basic,instagram_manage_comments,instagram_manage_messages';
+        const scope = 'instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement,business_management';
 
         if (!appId) {
-            throw new InternalServerErrorException('INSTAGRAM_APP_ID not configured');
+            throw new InternalServerErrorException('FACEBOOK_APP_ID not configured');
         }
 
-        return `https://api.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
+        return `https://www.facebook.com/v24.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
     }
 
     async exchangeCodeForToken(code: string) {
-        const appId = this.config.get<string>('INSTAGRAM_APP_ID');
-        const appSecret = this.config.get<string>('INSTAGRAM_APP_SECRET');
+        const appId = this.config.get<string>('FACEBOOK_APP_ID');
+        const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
         const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
 
         if (!appId || !appSecret) {
-            throw new InternalServerErrorException('Instagram credentials not configured');
+            throw new InternalServerErrorException('Facebook credentials not configured');
         }
 
         try {
-            const formData = new URLSearchParams();
-            formData.append('client_id', appId);
-            formData.append('client_secret', appSecret);
-            formData.append('grant_type', 'authorization_code');
-            formData.append('redirect_uri', redirectUri);
-            formData.append('code', code);
-
             const { data } = await firstValueFrom(
-                this.http.post('https://api.instagram.com/oauth/access_token', formData)
+                this.http.get('https://graph.facebook.com/v24.0/oauth/access_token', {
+                    params: {
+                        client_id: appId,
+                        redirect_uri: redirectUri,
+                        client_secret: appSecret,
+                        code: code,
+                    },
+                })
             );
             return data;
         } catch (error) {

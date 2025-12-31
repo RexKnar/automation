@@ -13,7 +13,11 @@ async function bootstrap() {
   const allowedOrigins = [
     process.env.FRONTEND_URL,
     process.env.NEXT_PUBLIC_FRONTEND_URL,
+    'http://localhost:3000',
+    'http://localhost:3001',
   ].filter(Boolean).map(origin => origin?.replace(/\/$/, ''));
+
+  console.log('Allowed Origins:', allowedOrigins);
 
   app.enableCors({
     origin: (requestOrigin, callback) => {
