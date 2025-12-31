@@ -328,7 +328,7 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.instagram.com/v24.0/${pageId}/messages`;
+            const url = `https://graph.facebook.com/v24.0/${pageId}/messages`;
 
             // Construct payload based on node content
             let recipient: any = { id: context.contactId };
