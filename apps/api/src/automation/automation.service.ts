@@ -97,14 +97,20 @@ export class AutomationService {
         // For MVP, we fetch all active flows with triggerType = KEYWORD (which we are using for comments)
         // In a real app, we should filter by the Instagram Account ID associated with the flow's workspace.
 
+        // Debug: Check total flows
+        const totalFlows = await this.prisma.flow.count();
+        console.log(`[Automation] Total flows in DB: ${totalFlows}`);
+
         const potentialFlows = await this.prisma.flow.findMany({
             where: {
                 isActive: true,
-                // triggerType: 'KEYWORD', // We are using KEYWORD for comment replies currently
             },
         });
 
         console.log(`[Automation] Found ${potentialFlows.length} active flows to check.`);
+        if (potentialFlows.length > 0) {
+            console.log(`[Automation] Flow IDs: ${potentialFlows.map(f => f.id).join(', ')}`);
+        }
 
         for (const flow of potentialFlows) {
             const nodes = flow.nodes as unknown as FlowNode[];
@@ -300,7 +306,7 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.instagram.com/v24.0/${pageId}/messages`;
+            const url = `https://graph.facebook.com/v24.0/${pageId}/messages`;
 
             // Construct payload based on node content
             let recipient: any = { id: context.contactId };
