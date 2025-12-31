@@ -72,7 +72,7 @@ export default function PrivacyPolicy() {
             Alternatively, you can remove our app's access directly from your Facebook settings:
           </p>
           <ol className="list-decimal list-inside text-gray-300 space-y-2 ml-4 mt-2">
-            <li>Go to your Facebook Account's "Settings & Privacy" > "Settings".</li>
+            <li>Go to your Facebook Account's "Settings & Privacy" {'>'} "Settings".</li>
             <li>Look for "Apps and Websites" and you will see all of the apps and websites you linked with your Facebook.</li>
             <li>Search and Click "Rexocial" in the search bar.</li>
             <li>Scroll and click "Remove".</li>
