@@ -117,7 +117,7 @@ export default function DashboardPage() {
                                 {getChannelIcon(channel.type)}
                             </div>
                             <div className="flex flex-col">
-                                <Link href={`/dashboard/${channel.id}`} className="hover:underline font-semibold text-blue-600">
+                                <Link href={`/dashboard/${channel.id}/flows`} className="hover:underline font-semibold text-blue-600">
                                     {channel.name}
                                 </Link>
                                 <span className="text-xs text-muted-foreground capitalize">{channel.type.toLowerCase()}</span>

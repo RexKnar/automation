@@ -46,6 +46,24 @@ export class AutomationService {
     }
 
     async getFlows(userId: string, workspaceId: string) {
+        if (!workspaceId) {
+            return [];
+        }
+
+        // Verify membership
+        const member = await this.prisma.workspaceMember.findUnique({
+            where: {
+                userId_workspaceId: {
+                    userId,
+                    workspaceId,
+                },
+            },
+        });
+
+        if (!member) {
+            throw new NotFoundException('Workspace not found or access denied');
+        }
+
         return this.prisma.flow.findMany({
             where: { workspaceId },
             orderBy: { updatedAt: 'desc' },
@@ -100,6 +118,10 @@ export class AutomationService {
         // Debug: Check total flows
         const totalFlows = await this.prisma.flow.count();
         console.log(`[Automation] Total flows in DB: ${totalFlows}`);
+
+        // Debug: Inspect ALL flows
+        const allFlows = await this.prisma.flow.findMany();
+        console.log(`[Automation] All Flows:`, JSON.stringify(allFlows.map(f => ({ id: f.id, name: f.name, isActive: f.isActive, triggerType: f.triggerType })), null, 2));
 
         const potentialFlows = await this.prisma.flow.findMany({
             where: {
@@ -306,7 +328,7 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.facebook.com/v24.0/${pageId}/messages`;
+            const url = `https://graph.instagram.com/v24.0/${pageId}/messages`;
 
             // Construct payload based on node content
             let recipient: any = { id: context.contactId };
@@ -320,6 +342,8 @@ export class AutomationService {
                 recipient,
                 message: { text: node.data.content },
             };
+
+            console.log(`[Automation] Payload:`, JSON.stringify(payload, null, 2));
 
             await firstValueFrom(this.http.post(url, payload, {
                 headers: { Authorization: `Bearer ${accessToken}` }

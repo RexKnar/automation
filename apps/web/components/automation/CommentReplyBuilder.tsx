@@ -71,6 +71,13 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
     setReplies(newReplies);
   };
 
+  const addKeyword = (word: string) => {
+    const newInput = keywordInput ? `${keywordInput}, ${word}` : word;
+    setKeywordInput(newInput);
+    setKeywords(newInput.split(",").map(s => s.trim()).filter(s => s.length > 0));
+    setActiveTab("comments");
+  };
+
   const validate = () => {
     const newErrors = [];
     
@@ -286,13 +293,13 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                                 value={keywordInput}
                                 onChange={handleKeywordChange}
                                 onFocus={() => setActiveTab("comments")}
-                                className="text-black"
+                                className="text-foreground"
                             />
                             <p className="text-xs text-muted-foreground">Use commas to separate words</p>
                             <div className="flex gap-2 flex-wrap">
-                                <span className="bg-white border px-2 py-1 rounded text-xs text-muted-foreground">Price</span>
-                                <span className="bg-white border px-2 py-1 rounded text-xs text-muted-foreground">Link</span>
-                                <span className="bg-white border px-2 py-1 rounded text-xs text-muted-foreground">Shop</span>
+                                <span onClick={() => addKeyword('Price')} className="bg-secondary border px-2 py-1 rounded text-xs text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors">Price</span>
+                                <span onClick={() => addKeyword('Link')} className="bg-secondary border px-2 py-1 rounded text-xs text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors">Link</span>
+                                <span onClick={() => addKeyword('Shop')} className="bg-secondary border px-2 py-1 rounded text-xs text-secondary-foreground cursor-pointer hover:bg-secondary/80 transition-colors">Shop</span>
                             </div>
                         </div>
                     )}
@@ -318,7 +325,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                                 value={reply}
                                 onChange={(e) => handleReplyChange(index, e.target.value)}
                                 placeholder={`Reply option ${index + 1}`}
-                                className="text-sm text-black"
+                                className="text-sm text-foreground"
                             />
                         ))}
                     </div>
@@ -341,7 +348,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                 {openingDM && (
                     <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
                         <textarea 
-                            className="w-full min-h-[100px] p-3 rounded-md border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+                            className="w-full min-h-[100px] p-3 rounded-md border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-foreground bg-background"
                             value={openingDMText}
                             onChange={(e) => setOpeningDMText(e.target.value)}
                         />
@@ -349,7 +356,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                             value={replyButtonText}
                             onChange={(e) => setReplyButtonText(e.target.value)}
                             placeholder="Button text"
-                            className="text-black"
+                            className="text-foreground"
                         />
                         <div className="flex items-center gap-1 text-xs text-blue-500 cursor-pointer hover:underline">
                             <Info className="w-3 h-3" />
@@ -384,7 +391,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
             <div className="space-y-4 p-4 border rounded-lg bg-card">
                 <Label className="font-medium">a DM with a link</Label>
                 <textarea 
-                    className="w-full min-h-[80px] p-3 rounded-md border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-black"
+                    className="w-full min-h-[80px] p-3 rounded-md border text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-foreground bg-background"
                     placeholder="Write a message"
                     value={dmLinkText}
                     onChange={(e) => setDmLinkText(e.target.value)}
@@ -398,7 +405,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                                 value={linkUrl}
                                 onChange={(e) => setLinkUrl(e.target.value)}
                                 placeholder="https://example.com"
-                                className="pl-9 text-black"
+                                className="pl-9 text-foreground"
                                 autoFocus
                             />
                         </div>
