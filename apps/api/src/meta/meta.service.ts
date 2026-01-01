@@ -53,6 +53,49 @@ export class MetaService {
         }
     }
 
+    getInstagramAuthUrl(state: string): string {
+        const appId = this.config.get<string>('INSTAGRAM_CLIENT_ID'); // Need to add this env var
+        const redirectUri = this.config.get<string>('INSTAGRAM_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback/instagram';
+        const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
+
+        if (!appId) {
+            // Fallback to FB App ID if not set, but usually they are different for IG Login
+            const fbAppId = this.config.get<string>('FACEBOOK_APP_ID');
+            if (!fbAppId) throw new InternalServerErrorException('INSTAGRAM_CLIENT_ID or FACEBOOK_APP_ID not configured');
+            return `https://www.instagram.com/oauth/authorize?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
+        }
+
+        return `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
+    }
+
+    async exchangeInstagramCode(code: string) {
+        const appId = this.config.get<string>('INSTAGRAM_CLIENT_ID') || this.config.get<string>('FACEBOOK_APP_ID');
+        const appSecret = this.config.get<string>('INSTAGRAM_CLIENT_SECRET') || this.config.get<string>('FACEBOOK_APP_SECRET');
+        const redirectUri = this.config.get<string>('INSTAGRAM_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback/instagram';
+
+        if (!appId || !appSecret) {
+            throw new InternalServerErrorException('Instagram credentials not configured');
+        }
+
+        try {
+            // Instagram Login uses form-data for token exchange
+            const params = new URLSearchParams();
+            params.append('client_id', appId);
+            params.append('client_secret', appSecret);
+            params.append('grant_type', 'authorization_code');
+            params.append('redirect_uri', redirectUri);
+            params.append('code', code);
+
+            const { data } = await firstValueFrom(
+                this.http.post('https://api.instagram.com/oauth/access_token', params)
+            );
+            return data;
+        } catch (error) {
+            console.error('Error exchanging IG code for token:', error?.response?.data || error.message);
+            throw new InternalServerErrorException('Failed to exchange IG code for token');
+        }
+    }
+
     async getLongLivedToken(shortLivedToken: string) {
         // Implementation pending
         return shortLivedToken;
@@ -123,6 +166,50 @@ export class MetaService {
             console.error('Error fetching Instagram media:', error?.response?.data || error.message);
             return [];
         }
+    }
+
+    async saveInstagramUserToken(userId: string, accessToken: string, expiresIn: number, instagramUserId: string) {
+        console.log(`[MetaService] Saving IG User token for user ${userId}. IG User ID: ${instagramUserId}`);
+
+        // Find workspace where user is OWNER or member
+        const workspaceMember = await (this.prisma as any).workspaceMember.findFirst({
+            where: { userId },
+            include: { workspace: true },
+        });
+
+        if (!workspaceMember) {
+            throw new InternalServerErrorException('No workspace found for user');
+        }
+
+        // Fetch user info from Instagram Graph API
+        let channelName = 'Instagram User';
+        try {
+            const { data: igUser } = await firstValueFrom(
+                this.http.get(`https://graph.instagram.com/v21.0/me?fields=username,account_type`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                })
+            );
+            if (igUser && igUser.username) {
+                channelName = igUser.username;
+            }
+        } catch (error) {
+            console.error('Failed to fetch IG user info:', error);
+        }
+
+        await (this.prisma as any).channel.create({
+            data: {
+                workspaceId: workspaceMember.workspaceId,
+                type: 'INSTAGRAM',
+                name: channelName,
+                config: {
+                    accessToken,
+                    expiresIn,
+                    metaBusinessId: instagramUserId, // For IG Login, this is the User ID
+                    isUserToken: true, // Flag to distinguish from Page Token
+                },
+                isActive: true,
+            },
+        });
     }
 
     async saveMetaTokens(userId: string, accessToken: string, expiresIn: number, metaBusinessId?: string) {

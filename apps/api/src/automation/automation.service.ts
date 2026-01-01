@@ -328,14 +328,20 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            // Debug: Check Permissions
+            // Debug: Check Permissions and Token Info
             try {
-                const permResponse = await firstValueFrom(this.http.get(`https://graph.facebook.com/v21.0/me/permissions`, {
-                    headers: { Authorization: `Bearer ${accessToken}` }
+                const appId = this.config.get<string>('FACEBOOK_APP_ID');
+                const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
+
+                const debugResponse = await firstValueFrom(this.http.get(`https://graph.facebook.com/v21.0/debug_token`, {
+                    params: {
+                        input_token: accessToken,
+                        access_token: `${appId}|${appSecret}` // App Access Token required for debug_token
+                    }
                 }));
-                console.log(`[Automation] Token Permissions:`, JSON.stringify(permResponse.data, null, 2));
+                console.log(`[Automation] Token Debug Info:`, JSON.stringify(debugResponse.data, null, 2));
             } catch (permError) {
-                console.error(`[Automation] Failed to check permissions:`, permError.message);
+                console.error(`[Automation] Failed to check token info:`, permError.message);
             }
 
             const url = `https://graph.facebook.com/v21.0/${pageId}/messages`;

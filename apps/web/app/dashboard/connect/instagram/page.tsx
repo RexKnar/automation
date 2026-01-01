@@ -24,6 +24,18 @@ export default function ConnectInstagramPage() {
     }
   };
 
+  const handleInstagramConnect = async () => {
+    try {
+      setIsLoading(true);
+      const { data } = await axios.get<{ authUrl: string }>("/meta/auth/instagram");
+      window.location.href = data.authUrl;
+    } catch (error) {
+      console.error("Failed to get instagram auth url", error);
+      toast.error("Failed to initiate instagram connection");
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-full bg-white dark:bg-gray-950">
       {/* Left Side - Illustration */}
@@ -63,14 +75,25 @@ export default function ConnectInstagramPage() {
           </p>
 
           <Button 
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12 text-lg mb-6"
+            className="w-full bg-[#1877F2] hover:bg-[#166fe5] text-white h-12 text-lg mb-4"
             onClick={handleConnect}
             disabled={isLoading}
           >
             {isLoading ? (
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
             ) : null}
-            Connect Via Meta
+            Connect via Facebook
+          </Button>
+
+          <Button 
+            className="w-full bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-90 text-white h-12 text-lg mb-6"
+            onClick={handleInstagramConnect}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : null}
+            Connect via Instagram
           </Button>
 
           <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg flex items-center justify-between border border-gray-100 dark:border-gray-800">

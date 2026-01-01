@@ -32,6 +32,14 @@ export class MetaController {
         return { authUrl };
     }
 
+    @Get('auth/instagram')
+    @HttpCode(HttpStatus.OK)
+    getInstagramAuthUrl(@GetCurrentUser('sub') userId: string) {
+        const state = randomBytes(16).toString('hex');
+        const authUrl = this.metaService.getInstagramAuthUrl(`${state}:${userId}`);
+        return { authUrl };
+    }
+
     @Public()
     @Get('callback')
     async handleCallback(
@@ -50,6 +58,30 @@ export class MetaController {
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=success`);
         } catch (error) {
             console.error('Meta OAuth callback error:', error);
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=error`);
+        }
+    }
+
+    @Public()
+    @Get('callback/instagram')
+    async handleInstagramCallback(
+        @Query('code') code: string,
+        @Query('state') state: string,
+        @Res() res: Response,
+    ) {
+        try {
+            const [, userIdStr] = state.split(':');
+            const userId = userIdStr;
+
+            const tokenData = await this.metaService.exchangeInstagramCode(code);
+            // We need a separate method or flag to indicate this is an IG User Token
+            await this.metaService.saveInstagramUserToken(userId, tokenData.access_token, tokenData.expires_in, tokenData.user_id);
+
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=success`);
+        } catch (error) {
+            console.error('Instagram OAuth callback error:', error);
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=error`);
         }
