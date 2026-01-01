@@ -9,20 +9,13 @@ import { GoogleModule } from './google/google.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { AutomationModule } from './automation/automation.module';
 import { ConfigModule } from '@nestjs/config';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+
 import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot({
-      throttlers: [{
-        name: 'default',
-        ttl: 6000,
-        limit: 999999,
-      }],
 
-    }),
     AuthModule,
     WorkspacesModule,
     MetaModule,
@@ -34,10 +27,7 @@ import { UsersModule } from './users/users.module';
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+
   ],
 })
 export class AppModule { }
