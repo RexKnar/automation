@@ -332,6 +332,11 @@ export class AutomationService {
             try {
                 const appId = this.config.get<string>('FACEBOOK_APP_ID');
                 const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
+                console.log(`[Automation] Token Debug Info:`, JSON.stringify(accessToken, null, 2));
+                console.log(`[Automation] Token Debug Info:`, JSON.stringify({
+                    input_token: accessToken,
+                    access_token: `${appId}|${appSecret}` // App Access Token required for debug_token
+                }, null, 2));
 
                 const debugResponse = await firstValueFrom(this.http.get(`https://graph.instagram.com/v21.0/debug_token`, {
                     params: {
