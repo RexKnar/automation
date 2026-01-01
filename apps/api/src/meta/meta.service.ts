@@ -54,24 +54,28 @@ export class MetaService {
     }
 
     getInstagramAuthUrl(state: string): string {
-        const appId = this.config.get<string>('INSTAGRAM_CLIENT_ID'); // Need to add this env var
-        const redirectUri = this.config.get<string>('INSTAGRAM_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback/instagram';
+        const appId = this.config.get<string>('INSTAGRAM_CLIENT_ID');
+        // Use the same redirect URI as Facebook Login to avoid "Invalid redirect_uri" if only one is whitelisted
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
         const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments,instagram_business_content_publish';
 
+        // Append :instagram to state to identify the flow in the callback
+        const instagramState = `${state}:instagram`;
+
         if (!appId) {
-            // Fallback to FB App ID if not set, but usually they are different for IG Login
             const fbAppId = this.config.get<string>('FACEBOOK_APP_ID');
             if (!fbAppId) throw new InternalServerErrorException('INSTAGRAM_CLIENT_ID or FACEBOOK_APP_ID not configured');
-            return `https://www.instagram.com/oauth/authorize?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
+            return `https://www.instagram.com/oauth/authorize?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${instagramState}`;
         }
 
-        return `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${state}`;
+        return `https://www.instagram.com/oauth/authorize?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${instagramState}`;
     }
 
     async exchangeInstagramCode(code: string) {
         const appId = this.config.get<string>('INSTAGRAM_CLIENT_ID') || this.config.get<string>('FACEBOOK_APP_ID');
         const appSecret = this.config.get<string>('INSTAGRAM_CLIENT_SECRET') || this.config.get<string>('FACEBOOK_APP_SECRET');
-        const redirectUri = this.config.get<string>('INSTAGRAM_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback/instagram';
+        // Must match the redirect_uri used in the auth request
+        const redirectUri = this.config.get<string>('META_REDIRECT_URI') || 'https://rexocialapi.rexcoders.in/meta/callback';
 
         if (!appId || !appSecret) {
             throw new InternalServerErrorException('Instagram credentials not configured');

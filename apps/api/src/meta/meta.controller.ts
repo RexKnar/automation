@@ -48,17 +48,29 @@ export class MetaController {
         @Res() res: Response,
     ) {
         try {
-            const [, userIdStr] = state.split(':');
-            const userId = userIdStr;
+            const parts = state.split(':');
+            const userId = parts[1]; // state format: random:userId[:type]
+            const type = parts[2];
 
+            if (type === 'instagram') {
+                // Handle Instagram Login Callback
+                const tokenData = await this.metaService.exchangeInstagramCode(code);
+                await this.metaService.saveInstagramUserToken(userId, tokenData.access_token, tokenData.expires_in, tokenData.user_id);
+
+                const frontendUrl = process.env.FRONTEND_URL || 'https://rexocial.rexcoders.in';
+                res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=success`);
+                return;
+            }
+
+            // Handle Facebook Login Callback
             const tokenData = await this.metaService.exchangeCodeForToken(code);
             await this.metaService.saveMetaTokens(userId, tokenData.access_token, tokenData.expires_in, tokenData.user_id);
 
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const frontendUrl = process.env.FRONTEND_URL || 'https://rexocial.rexcoders.in';
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=success`);
         } catch (error) {
             console.error('Meta OAuth callback error:', error);
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const frontendUrl = process.env.FRONTEND_URL || 'https://rexocial.rexcoders.in';
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=error`);
         }
     }
@@ -78,11 +90,11 @@ export class MetaController {
             // We need a separate method or flag to indicate this is an IG User Token
             await this.metaService.saveInstagramUserToken(userId, tokenData.access_token, tokenData.expires_in, tokenData.user_id);
 
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const frontendUrl = process.env.FRONTEND_URL || 'https://rexocial.rexcoders.in';
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=success`);
         } catch (error) {
             console.error('Instagram OAuth callback error:', error);
-            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const frontendUrl = process.env.FRONTEND_URL || 'https://rexocial.rexcoders.in';
             res.redirect(`${frontendUrl}/dashboard/connect/instagram?status=error`);
         }
     }
