@@ -104,8 +104,27 @@ export class MetaService {
     }
 
     async getLongLivedToken(shortLivedToken: string) {
-        // Implementation pending
-        return shortLivedToken;
+        const appSecret = this.config.get<string>('INSTAGRAM_CLIENT_SECRET') || this.config.get<string>('FACEBOOK_APP_SECRET');
+
+        if (!appSecret) {
+            throw new InternalServerErrorException('Instagram credentials not configured');
+        }
+
+        try {
+            const { data } = await firstValueFrom(
+                this.http.get('https://graph.instagram.com/access_token', {
+                    params: {
+                        grant_type: 'ig_exchange_token',
+                        client_secret: appSecret,
+                        access_token: shortLivedToken,
+                    },
+                })
+            );
+            return data;
+        } catch (error) {
+            console.error('Error exchanging for long-lived token:', error?.response?.data || error.message);
+            throw new InternalServerErrorException('Failed to get long-lived token');
+        }
     }
 
     async getBusinessAccounts(accessToken: string) {
@@ -177,6 +196,18 @@ export class MetaService {
 
     async saveInstagramUserToken(userId: string, accessToken: string, expiresIn: number, instagramUserId: string) {
         console.log(`[MetaService] Saving IG User token for user ${userId}. IG User ID: ${instagramUserId}`);
+
+        // Exchange for Long-Lived Token
+        try {
+            const longLivedData = await this.getLongLivedToken(accessToken);
+            if (longLivedData && longLivedData.access_token) {
+                console.log('[MetaService] Obtained Long-Lived Token');
+                accessToken = longLivedData.access_token;
+                expiresIn = longLivedData.expires_in;
+            }
+        } catch (error) {
+            console.warn('[MetaService] Failed to get long-lived token, proceeding with short-lived one:', error.message);
+        }
 
         // Find workspace where user is OWNER or member
         const workspaceMember = await (this.prisma as any).workspaceMember.findFirst({
