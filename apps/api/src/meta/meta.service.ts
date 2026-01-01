@@ -102,25 +102,14 @@ export class MetaService {
         }
 
         const accessToken = channel.config.accessToken;
+        const instagramAccountId = (channel.config as any).metaBusinessId;
+
+        if (!instagramAccountId) {
+            console.warn('No Instagram Business Account ID found in channel config');
+            return [];
+        }
 
         try {
-            // 1. Get the Instagram Business Account ID
-            // We first get the user's pages, then the connected IG account
-            const pagesResponse = await firstValueFrom(
-                this.http.get(`https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account,name`, {
-                    headers: { Authorization: `Bearer ${accessToken}` }
-                })
-            );
-
-            const page = pagesResponse.data.data.find((p: any) => p.instagram_business_account);
-
-            if (!page || !page.instagram_business_account) {
-                console.warn('No Instagram Business Account found for this user');
-                return [];
-            }
-
-            const instagramAccountId = page.instagram_business_account.id;
-
             // 2. Fetch Media
             const mediaResponse = await firstValueFrom(
                 this.http.get(`https://graph.facebook.com/v21.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
