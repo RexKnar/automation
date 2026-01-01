@@ -3,7 +3,7 @@
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { Loader2, Plus, Search, Pin, EyeOff, Instagram, MessageCircle, Mail, Trash2 } from "lucide-react";
 import axios from "axios";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,7 +24,6 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { data: workspaces, isLoading, refetch } = useWorkspaces();
-  const { toast } = useToast();
   const currentWorkspace = workspaces?.[0];
   const channels = currentWorkspace?.channels || [];
 
@@ -42,17 +41,10 @@ export default function DashboardPage() {
     
     try {
         await axios.delete('/meta/disconnect');
-        toast({
-            title: "Disconnected",
-            description: "Account disconnected successfully",
-        });
+        toast.success("Account disconnected successfully");
         refetch();
     } catch (error) {
-        toast({
-            title: "Error",
-            description: "Failed to disconnect account",
-            variant: "destructive",
-        });
+        toast.error("Failed to disconnect account");
     }
   };
 
