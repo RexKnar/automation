@@ -1,7 +1,9 @@
 "use client";
 
 import { useWorkspaces } from "@/hooks/use-workspaces";
-import { Loader2, Plus, Search, Pin, EyeOff, Instagram, MessageCircle, Mail } from "lucide-react";
+import { Loader2, Plus, Search, Pin, EyeOff, Instagram, MessageCircle, Mail, Trash2 } from "lucide-react";
+import axios from "axios";
+import { useToast } from "@/components/ui/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +23,8 @@ import {
 import Link from "next/link";
 
 export default function DashboardPage() {
-  const { data: workspaces, isLoading } = useWorkspaces();
+  const { data: workspaces, isLoading, refetch } = useWorkspaces();
+  const { toast } = useToast();
   const currentWorkspace = workspaces?.[0];
   const channels = currentWorkspace?.channels || [];
 
@@ -31,6 +34,25 @@ export default function DashboardPage() {
       case 'WHATSAPP': return <MessageCircle className="w-5 h-5 text-green-600" />;
       case 'EMAIL': return <Mail className="w-5 h-5 text-blue-600" />;
       default: return <MessageCircle className="w-5 h-5 text-gray-600" />;
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm("Are you sure you want to disconnect this account?")) return;
+    
+    try {
+        await axios.delete('/meta/disconnect');
+        toast({
+            title: "Disconnected",
+            description: "Account disconnected successfully",
+        });
+        refetch();
+    } catch (error) {
+        toast({
+            title: "Error",
+            description: "Failed to disconnect account",
+            variant: "destructive",
+        });
     }
   };
 
@@ -99,6 +121,7 @@ export default function DashboardPage() {
                   <TableHead>Contacts</TableHead>
                   <TableHead>Pin</TableHead>
                   <TableHead>Hide</TableHead>
+                  <TableHead>Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -138,6 +161,11 @@ export default function DashboardPage() {
                       <TableCell>
                         <Button variant="ghost" size="icon" className="text-muted-foreground">
                             <EyeOff className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={handleDisconnect}>
+                            <Trash2 className="w-4 h-4" />
                         </Button>
                       </TableCell>
                     </TableRow>

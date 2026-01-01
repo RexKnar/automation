@@ -317,6 +317,21 @@ export class MetaService {
     }
 
     async disconnectMeta(userId: string) {
-        // Implementation pending
+        // Find workspace where user is a member
+        const workspaceMember = await (this.prisma as any).workspaceMember.findFirst({
+            where: { userId },
+        });
+
+        if (!workspaceMember) {
+            throw new InternalServerErrorException('No workspace found for user');
+        }
+
+        // Delete the Instagram channel
+        await (this.prisma as any).channel.deleteMany({
+            where: {
+                workspaceId: workspaceMember.workspaceId,
+                type: 'INSTAGRAM',
+            },
+        });
     }
 }
