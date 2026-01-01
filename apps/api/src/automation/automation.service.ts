@@ -333,7 +333,7 @@ export class AutomationService {
                 const appId = this.config.get<string>('FACEBOOK_APP_ID');
                 const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
 
-                const debugResponse = await firstValueFrom(this.http.get(`https://graph.facebook.com/v21.0/debug_token`, {
+                const debugResponse = await firstValueFrom(this.http.get(`https://graph.instagram.com/v21.0/debug_token`, {
                     params: {
                         input_token: accessToken,
                         access_token: `${appId}|${appSecret}` // App Access Token required for debug_token
@@ -344,7 +344,7 @@ export class AutomationService {
                 console.error(`[Automation] Failed to check token info:`, permError.message);
             }
 
-            const url = `https://graph.facebook.com/v21.0/${pageId}/messages`;
+            const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
 
             // Construct payload based on node content
             let recipient: any = { id: context.contactId };

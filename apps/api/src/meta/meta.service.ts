@@ -62,8 +62,11 @@ export class MetaService {
         // Append :instagram to state to identify the flow in the callback
         const instagramState = `${state}:instagram`;
 
+        console.log(`[MetaService] Generating Instagram Auth URL. Configured INSTAGRAM_CLIENT_ID: ${appId}`);
+
         if (!appId) {
             const fbAppId = this.config.get<string>('FACEBOOK_APP_ID');
+            console.log(`[MetaService] Fallback to FACEBOOK_APP_ID: ${fbAppId}`);
             if (!fbAppId) throw new InternalServerErrorException('INSTAGRAM_CLIENT_ID or FACEBOOK_APP_ID not configured');
             return `https://www.instagram.com/oauth/authorize?client_id=${fbAppId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&response_type=code&state=${instagramState}`;
         }
