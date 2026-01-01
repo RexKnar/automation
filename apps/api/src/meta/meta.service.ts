@@ -140,11 +140,13 @@ export class MetaService {
         console.log(`[MetaService] Saving tokens for user ${userId}. Initial metaBusinessId: ${metaBusinessId}`);
 
         // If metaBusinessId is not provided, fetch it
+        let pageAccessToken = accessToken; // Default to user token, but try to get page token
+
         if (!metaBusinessId) {
             try {
                 console.log('[MetaService] Fetching Instagram Business Account ID...');
                 const pagesResponse = await firstValueFrom(
-                    this.http.get(`https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account,name`, {
+                    this.http.get(`https://graph.facebook.com/v21.0/me/accounts?fields=instagram_business_account,name,access_token`, {
                         headers: { Authorization: `Bearer ${accessToken}` }
                     })
                 );
@@ -153,6 +155,10 @@ export class MetaService {
                 const page = pagesResponse.data.data.find((p: any) => p.instagram_business_account);
                 if (page && page.instagram_business_account) {
                     metaBusinessId = page.instagram_business_account.id;
+                    if (page.access_token) {
+                        pageAccessToken = page.access_token;
+                        console.log('[MetaService] Found Page Access Token');
+                    }
                     console.log(`[MetaService] Found metaBusinessId: ${metaBusinessId}`);
                 } else {
                     console.warn('[MetaService] No Instagram Business Account found in pages response.');
@@ -199,7 +205,7 @@ export class MetaService {
                     type: 'INSTAGRAM',
                     name: channelName,
                     config: {
-                        accessToken,
+                        accessToken: pageAccessToken, // Use Page Token
                         expiresIn,
                         metaBusinessId,
                     },
@@ -232,7 +238,7 @@ export class MetaService {
                 type: 'INSTAGRAM',
                 name: channelName,
                 config: {
-                    accessToken,
+                    accessToken: pageAccessToken, // Use Page Token
                     expiresIn,
                     metaBusinessId,
                 },
