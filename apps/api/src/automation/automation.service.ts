@@ -328,7 +328,17 @@ export class AutomationService {
 
         // 2. Send Message via Graph API
         try {
-            const url = `https://graph.facebook.com/v24.0/${pageId}/messages`;
+            // Debug: Check Permissions
+            try {
+                const permResponse = await firstValueFrom(this.http.get(`https://graph.facebook.com/v21.0/me/permissions`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                }));
+                console.log(`[Automation] Token Permissions:`, JSON.stringify(permResponse.data, null, 2));
+            } catch (permError) {
+                console.error(`[Automation] Failed to check permissions:`, permError.message);
+            }
+
+            const url = `https://graph.facebook.com/v21.0/${pageId}/messages`;
 
             // Construct payload based on node content
             let recipient: any = { id: context.contactId };
