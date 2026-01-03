@@ -184,12 +184,12 @@ export class AutomationService {
             // Match Found! Trigger Flow
             console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
 
-            await this.runFlow(flow.id, data.fromId, { commentId: data.commentId });
+            await this.runFlow(flow.id, data.fromId, { commentId: data.commentId }, true); // isNewExecution: true
         }
     }
 
     // Wrapper to check gates before triggering
-    async runFlow(flowId: string, externalId: string, metadata?: any) {
+    async runFlow(flowId: string, externalId: string, metadata?: any, isNewExecution: boolean = false) {
         const flow = await this.getFlow(flowId);
 
         // 1. Resolve Contact
@@ -228,7 +228,7 @@ export class AutomationService {
             }
         }
 
-        const canProceed = await this.checkGates(flow, contact, { variables: metadata });
+        const canProceed = await this.checkGates(flow, contact, { variables: metadata }, isNewExecution);
 
         if (canProceed) {
             console.log(`[Automation] Gates passed for Flow ${flow.name}. Executing...`);
@@ -270,35 +270,36 @@ export class AutomationService {
                 const flow = await this.getFlow(pendingFlowId);
                 const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
 
-                // Handle Postbacks
-                if (data.isPostback) {
-                    if (data.payload === 'FOLLOW_CONFIRMED') {
-                        console.log(`[Automation] Follow Confirmed via Button`);
-                        await this.prisma.contact.update({
-                            where: { id: contact.id },
-                            data: {
-                                customData: { ...(contact.customData as any), isFollower: true }
-                            }
-                        });
-                        await this.prisma.automationDeliveryLog.update({
-                            where: { id: log.id },
-                            data: { followConfirmed: true }
-                        });
-                        // Resume
-                        await this.triggerFlow(flow.id, contact.id, data.fromId, (contact.customData as any).pendingMetadata);
-                        return;
-                    }
+                // Handle Postbacks & Keywords for Flow Resume
+                const text = data.text?.toLowerCase() || '';
+                const payload = data.payload?.toLowerCase() || '';
 
-                    if (data.payload === 'SEND_LINK') {
-                        console.log(`[Automation] Opening Button Clicked`);
-                        await this.prisma.automationDeliveryLog.update({
-                            where: { id: log.id },
-                            data: { openingClicked: true }
-                        });
-                        // Resume
-                        await this.runFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
-                        return;
-                    }
+                if (payload === 'follow_confirmed' || text === 'followed') {
+                    console.log(`[Automation] Follow Confirmed`);
+                    await this.prisma.contact.update({
+                        where: { id: contact.id },
+                        data: {
+                            customData: { ...(contact.customData as any), isFollower: true }
+                        }
+                    });
+                    await this.prisma.automationDeliveryLog.update({
+                        where: { id: log.id },
+                        data: { followConfirmed: true }
+                    });
+                    // Resume
+                    await this.runFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata, false);
+                    return;
+                }
+
+                if (payload === 'send_link' || payload === 'send_link_click' || text === 'send_link') {
+                    console.log(`[Automation] Opening Button Clicked`);
+                    await this.prisma.automationDeliveryLog.update({
+                        where: { id: log.id },
+                        data: { openingClicked: true }
+                    });
+                    // Resume
+                    await this.runFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata, false);
+                    return;
                 }
 
                 // Handle Email Input
@@ -363,7 +364,7 @@ export class AutomationService {
                     },
                 });
 
-                await this.runFlow(flow.id, data.fromId);
+                await this.runFlow(flow.id, data.fromId, {}, true); // isNewExecution: true
                 // Only trigger one flow per keyword match? For now, yes.
                 break;
             }
@@ -484,7 +485,7 @@ export class AutomationService {
         await this.runFlow(flowId, contactId, metadata);
     }
 
-    async checkGates(flow: any, contact: any, context: any): Promise<boolean> {
+    async checkGates(flow: any, contact: any, context: any, isNewExecution: boolean = false): Promise<boolean> {
         const nodes = flow.nodes as unknown as FlowNode[];
         const triggerNode = nodes.find(n => n.type === 'TRIGGER');
         if (!triggerNode) return true;
@@ -501,7 +502,7 @@ export class AutomationService {
         }
 
         // Get Delivery Log
-        const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
+        const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId, isNewExecution);
 
         // 1. Follow Check
         if (requireFollow) {
@@ -656,19 +657,20 @@ export class AutomationService {
         }
     }
 
-    async getOrCreateDeliveryLog(flowId: string, contactId: string, workspaceId: string) {
+    async getOrCreateDeliveryLog(flowId: string, contactId: string, workspaceId: string, forceNew: boolean = false) {
+        if (forceNew) {
+            // Cancel existing in-progress logs
+            // Assuming we don't have a status field yet, but if we did, we'd update it.
+            // For now, just creating a new one effectively "resets" the state for this flow run.
+            // We could also update the contact's pendingFlowId to null before this, but runFlow handles overwriting it.
+        }
+
         let log = await this.prisma.automationDeliveryLog.findFirst({
             where: { flowId, contactId },
             orderBy: { createdAt: 'desc' }
         });
 
-        // Create new log if none exists or if the last one is "complete" (logic depends on requirements, for now just one per flow/contact or create new if old)
-        // For simplicity, let's create a new one if the last one is older than X or if we want to track every run.
-        // But checkGates needs to find the *current* run.
-        // Let's assume we reuse the existing one if it's not fully complete, or create new.
-        // For this task, I'll just findFirst or create.
-
-        if (!log) {
+        if (!log || forceNew) {
             log = await this.prisma.automationDeliveryLog.create({
                 data: { flowId, contactId, workspaceId }
             });
