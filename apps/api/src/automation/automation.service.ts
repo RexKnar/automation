@@ -202,7 +202,7 @@ export class AutomationService {
                     }
                 }
             },
-            include: { channels: true }
+            include: { channels: { include: { channel: true } } }
         });
 
         if (!contact) {
@@ -220,7 +220,7 @@ export class AutomationService {
                         },
                         customData: {}
                     },
-                    include: { channels: true }
+                    include: { channels: { include: { channel: true } } }
                 });
             } else {
                 console.error(`[Automation] No Instagram channel found for workspace ${flow.workspaceId}`);
@@ -492,7 +492,7 @@ export class AutomationService {
         const { requireFollow, openingDM, requireEmail, openingDMText, replyButtonText } = triggerNode.data;
 
         // Resolve externalId for sending messages
-        const channel = contact.channels.find((c: any) => c.channel.type === 'INSTAGRAM');
+        const channel = contact.channels.find((c: any) => c.channel && c.channel.type === 'INSTAGRAM');
         const externalId = channel?.externalId;
 
         if (!externalId) {
