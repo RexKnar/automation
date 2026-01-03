@@ -36,10 +36,15 @@ export class AutomationService {
         // Debug: Check Trigger Node Data
         if (data.nodes) {
             const triggerNode = data.nodes.find((n: any) => n.type === 'TRIGGER');
+            const followNode = data.nodes.find((n: any) => n.id.includes('request_follow_dm') || n.data.messageType === 'request_follow_dm');
+
             if (triggerNode) {
                 console.log(`[Automation] Creating Flow - Trigger Data:`, JSON.stringify(triggerNode.data, null, 2));
+            }
+            if (followNode) {
+                console.log(`[Automation] Creating Flow - Follow Node Found:`, JSON.stringify(followNode, null, 2));
             } else {
-                console.log(`[Automation] Creating Flow - No Trigger Node found.`);
+                console.log(`[Automation] Creating Flow - No Follow Node found.`);
             }
         }
 
@@ -92,8 +97,13 @@ export class AutomationService {
         // Debug: Check Trigger Node Data on Update
         if (data.nodes) {
             const triggerNode = data.nodes.find((n: any) => n.type === 'TRIGGER');
+            const followNode = data.nodes.find((n: any) => n.id.includes('request_follow_dm') || n.data.messageType === 'request_follow_dm');
+
             if (triggerNode) {
                 console.log(`[Automation] Updating Flow ${id} - Trigger Data:`, JSON.stringify(triggerNode.data, null, 2));
+            }
+            if (followNode) {
+                console.log(`[Automation] Updating Flow ${id} - Follow Node Found:`, JSON.stringify(followNode, null, 2));
             }
         }
 
