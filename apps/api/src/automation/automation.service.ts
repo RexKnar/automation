@@ -766,8 +766,15 @@ export class AutomationService {
 
             let payload: any;
             const lowerText = messageText.toLowerCase();
+            const nodeId = node.id.toLowerCase();
+            const messageType = node.data.messageType || '';
 
-            if (links && links.length > 0) {
+            // Determine Message Type based on ID or Data
+            const isLinkDM = nodeId.includes('link_dm') || messageType === 'link_dm' || (links && links.length > 0);
+            const isOpeningDM = nodeId.includes('opening_dm') || messageType === 'opening_dm';
+            const isFollowDM = nodeId.includes('request_follow_dm') || messageType === 'request_follow_dm' || lowerText.includes('follow');
+
+            if (isLinkDM && links && links.length > 0) {
                 // 1. Link Message
                 const linkUrl = links[0];
                 const cleanText = messageText.replace(linkUrl, '').trim() || "Click the button below:";
@@ -786,14 +793,14 @@ export class AutomationService {
                                     {
                                         type: "web_url",
                                         url: trackingUrl,
-                                        title: "Open the link"
+                                        title: node.data.dmLinkText || "Open the link"
                                     }
                                 ]
                             }
                         }
                     }
                 };
-            } else if (lowerText.includes('follow')) {
+            } else if (isFollowDM) {
                 // 2. Ask to Follow Message
                 payload = {
                     recipient,
@@ -814,7 +821,7 @@ export class AutomationService {
                         }
                     }
                 };
-            } else if (lowerText.includes('link') || lowerText.includes('send')) {
+            } else if (isOpeningDM) {
                 // 3. Opening Message (Send Link)
                 payload = {
                     recipient,
@@ -828,7 +835,7 @@ export class AutomationService {
                                     {
                                         type: "postback",
                                         payload: "send_link_click",
-                                        title: "Send Link"
+                                        title: "Send_Link"
                                     }
                                 ]
                             }
