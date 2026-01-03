@@ -770,14 +770,15 @@ export class AutomationService {
             const messageType = node.data.messageType || '';
 
             // Determine Message Type based on ID or Data
-            const isLinkDM = nodeId.includes('link_dm') || messageType === 'link_dm' || (links && links.length > 0);
+            const dmLink = node.data.dm_link;
+            const isLinkDM = nodeId.includes('link_dm') || messageType === 'link_dm' || !!dmLink || (links && links.length > 0);
             const isOpeningDM = nodeId.includes('opening_dm') || messageType === 'opening_dm';
             const isFollowDM = nodeId.includes('request_follow_dm') || messageType === 'request_follow_dm' || lowerText.includes('follow');
 
-            if (isLinkDM && links && links.length > 0) {
+            if (isLinkDM && (dmLink || (links && links.length > 0))) {
                 // 1. Link Message
-                const linkUrl = links[0];
-                const cleanText = messageText.replace(linkUrl, '').trim() || "Click the button below:";
+                const linkUrl = dmLink || links[0];
+                const cleanText = dmLink ? messageText : (messageText.replace(linkUrl, '').trim() || "Click the button below:");
                 const encodedUrl = encodeURIComponent(linkUrl);
                 const trackingUrl = `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
 
