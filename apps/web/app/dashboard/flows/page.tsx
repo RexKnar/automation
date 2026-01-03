@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, MoreVertical, Play, Edit, Loader2, MessageCircle } from "lucide-react";
+import { Plus, MoreVertical, Play, Edit, Loader2, MessageCircle, BarChart } from "lucide-react";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useFlows, useCreateFlow } from "@/hooks/use-flows";
 import { useState } from "react";
@@ -196,13 +196,22 @@ export default function FlowsPage() {
                                         }`}>
                                         {flow.isActive ? 'Active' : 'Draft'}
                                     </span>
-                                    <Link 
-                                        href={editUrl} 
-                                        className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center px-3 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        Edit <Edit className="w-3 h-3 ml-1" />
-                                    </Link>
+                                    <div className="flex gap-2">
+                                        <Link 
+                                            href={`/dashboard/${defaultChannelId}/automations/${flow.id}/insights`}
+                                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center px-3 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            Insights <BarChart className="w-3 h-3 ml-1" />
+                                        </Link>
+                                        <Link 
+                                            href={editUrl} 
+                                            className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center px-3 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            Edit <Edit className="w-3 h-3 ml-1" />
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
                         );

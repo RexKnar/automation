@@ -43,6 +43,7 @@ model Workspace {
   tags         Tag[]
   customFields CustomField[]
   logs         AutomationLog[]
+  deliveryLogs AutomationDeliveryLog[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -104,6 +105,7 @@ model Flow {
 
   stats FlowStats?
   logs  AutomationLog[]
+  deliveryLogs AutomationDeliveryLog[]
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -160,6 +162,7 @@ model Contact {
   // Channels this contact is reachable on
   channels      ContactChannel[]
   conversations Conversation[]
+  deliveryLogs  AutomationDeliveryLog[]
 
   lastInteractionAt DateTime @default(now())
   createdAt         DateTime @default(now())
@@ -324,4 +327,38 @@ enum ContentType {
   AUDIO
   FILE
   TEMPLATE // WhatsApp Templates
+}
+
+model AutomationDeliveryLog {
+  id          String   @id @default(uuid())
+  flowId      String
+  contactId   String
+  workspaceId String
+  
+  // Status Flags
+  followMsgSent    Boolean @default(false)
+  followMsgRead    Boolean @default(false) // If possible via webhooks
+  followConfirmed  Boolean @default(false)
+  
+  openingMsgSent   Boolean @default(false)
+  openingMsgRead   Boolean @default(false)
+  openingClicked   Boolean @default(false) // "Send me the link" clicked
+  
+  emailReqSent     Boolean @default(false)
+  emailProvided    Boolean @default(false)
+  
+  linkMsgSent      Boolean @default(false)
+  linkMsgRead      Boolean @default(false)
+  linkClicked      Boolean @default(false)
+  
+  followUpSent     Boolean @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flow      Flow      @relation(fields: [flowId], references: [id])
+  contact   Contact   @relation(fields: [contactId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([flowId, contactId])
 }
