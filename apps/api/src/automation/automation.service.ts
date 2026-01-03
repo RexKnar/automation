@@ -189,13 +189,50 @@ export class AutomationService {
     }
 
     // Wrapper to check gates before triggering
-    async runFlow(flowId: string, contactId: string, metadata?: any) {
+    async runFlow(flowId: string, externalId: string, metadata?: any) {
         const flow = await this.getFlow(flowId);
-        const canProceed = await this.checkGates(flow, contactId, { variables: metadata });
+
+        // 1. Resolve Contact
+        let contact = await this.prisma.contact.findFirst({
+            where: {
+                channels: {
+                    some: {
+                        externalId: externalId,
+                        channel: { type: 'INSTAGRAM' }
+                    }
+                }
+            },
+            include: { channels: true }
+        });
+
+        if (!contact) {
+            // Create Contact if missing (Lazy creation)
+            const channel = await this.prisma.channel.findFirst({
+                where: { workspaceId: flow.workspaceId, type: 'INSTAGRAM' }
+            });
+
+            if (channel) {
+                contact = await this.prisma.contact.create({
+                    data: {
+                        workspaceId: flow.workspaceId,
+                        channels: {
+                            create: { channelId: channel.id, externalId: externalId, metadata: {} }
+                        },
+                        customData: {}
+                    },
+                    include: { channels: true }
+                });
+            } else {
+                console.error(`[Automation] No Instagram channel found for workspace ${flow.workspaceId}`);
+                return;
+            }
+        }
+
+        const canProceed = await this.checkGates(flow, contact, { variables: metadata });
 
         if (canProceed) {
             console.log(`[Automation] Gates passed for Flow ${flow.name}. Executing...`);
-            await this.triggerFlow(flowId, contactId, metadata);
+            await this.triggerFlow(flowId, contact.id, externalId, metadata);
         } else {
             console.log(`[Automation] Flow ${flow.name} gated/paused.`);
         }
@@ -248,7 +285,7 @@ export class AutomationService {
                             data: { followConfirmed: true }
                         });
                         // Resume
-                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        await this.triggerFlow(flow.id, contact.id, data.fromId, (contact.customData as any).pendingMetadata);
                         return;
                     }
 
@@ -349,7 +386,7 @@ export class AutomationService {
         return true;
     }
 
-    async triggerFlow(flowId: string, contactId: string, metadata?: any) {
+    async triggerFlow(flowId: string, contactId: string, externalId?: string, metadata?: any) {
         const flow = await this.getFlow(flowId);
         const nodes = flow.nodes as unknown as FlowNode[];
 
@@ -359,7 +396,8 @@ export class AutomationService {
 
         const context: ExecutionContext = {
             workspaceId: flow.workspaceId,
-            contactId,
+            contactId, // Internal UUID
+            externalId, // Platform ID (PSID)
             flowId,
             variables: metadata || {},
         };
@@ -446,38 +484,20 @@ export class AutomationService {
         await this.runFlow(flowId, contactId, metadata);
     }
 
-    async checkGates(flow: any, contactId: string, context: any): Promise<boolean> {
+    async checkGates(flow: any, contact: any, context: any): Promise<boolean> {
         const nodes = flow.nodes as unknown as FlowNode[];
         const triggerNode = nodes.find(n => n.type === 'TRIGGER');
         if (!triggerNode) return true;
 
         const { requireFollow, openingDM, requireEmail, openingDMText, replyButtonText } = triggerNode.data;
 
-        // Get Contact
-        let contact = await this.prisma.contact.findFirst({
-            where: {
-                channels: { some: { externalId: contactId, channel: { type: 'INSTAGRAM' } } }
-            },
-            include: { channels: true }
-        });
+        // Resolve externalId for sending messages
+        const channel = contact.channels.find((c: any) => c.channel.type === 'INSTAGRAM');
+        const externalId = channel?.externalId;
 
-        if (!contact) {
-            // Create Contact if missing
-            const channel = await this.prisma.channel.findFirst({
-                where: { workspaceId: flow.workspaceId, type: 'INSTAGRAM' }
-            });
-            if (!channel) return false;
-
-            contact = await this.prisma.contact.create({
-                data: {
-                    workspaceId: flow.workspaceId,
-                    channels: {
-                        create: { channelId: channel.id, externalId: contactId, metadata: {} }
-                    },
-                    customData: {}
-                },
-                include: { channels: true }
-            });
+        if (!externalId) {
+            console.error(`[Automation] No external ID found for contact ${contact.id}`);
+            return false;
         }
 
         // Get Delivery Log
@@ -488,8 +508,8 @@ export class AutomationService {
             const isFollower = (contact.customData as any)?.isFollower || log.followConfirmed;
             if (!isFollower) {
                 if (!log.followMsgSent) {
-                    console.log(`[Automation] Sending Follow Request to ${contactId}`);
-                    await this.sendButtonMessage(contactId, flow.workspaceId, "Please follow our page to continue.", [
+                    console.log(`[Automation] Sending Follow Request to ${externalId}`);
+                    await this.sendButtonMessage(externalId, flow.workspaceId, "Please follow our page to continue.", [
                         { type: 'postback', title: 'Done', payload: 'FOLLOW_CONFIRMED' }
                     ]);
                     await this.prisma.automationDeliveryLog.update({
@@ -517,11 +537,11 @@ export class AutomationService {
         if (openingDM) {
             if (!log.openingClicked) {
                 if (!log.openingMsgSent) {
-                    console.log(`[Automation] Sending Opening Message to ${contactId}`);
+                    console.log(`[Automation] Sending Opening Message to ${externalId}`);
                     const text = openingDMText || "Hey there! Click below to get the link.";
                     const btnText = replyButtonText || "Send me the link";
 
-                    await this.sendButtonMessage(contactId, flow.workspaceId, text, [
+                    await this.sendButtonMessage(externalId, flow.workspaceId, text, [
                         { type: 'postback', title: btnText, payload: 'SEND_LINK' }
                     ]);
 
@@ -550,8 +570,8 @@ export class AutomationService {
         if (requireEmail) {
             if (!contact.email && !log.emailProvided) {
                 if (!log.emailReqSent) {
-                    console.log(`[Automation] Sending Email Request to ${contactId}`);
-                    await this.sendEmailRequest(contactId, flow.workspaceId);
+                    console.log(`[Automation] Sending Email Request to ${externalId}`);
+                    await this.sendEmailRequest(externalId, flow.workspaceId);
                     await this.prisma.automationDeliveryLog.update({
                         where: { id: log.id },
                         data: { emailReqSent: true }
@@ -706,6 +726,23 @@ export class AutomationService {
         const accessToken = (channel.config as any).accessToken;
         const pageId = (channel.config as any).metaBusinessId;
 
+        // Resolve External ID (PSID)
+        let recipientId = context.externalId;
+        if (!recipientId) {
+            // Try to fetch from DB if not in context
+            const contact = await this.prisma.contact.findUnique({
+                where: { id: context.contactId },
+                include: { channels: { include: { channel: true } } }
+            });
+            const contactChannel = contact?.channels.find(c => c.channel.type === 'INSTAGRAM');
+            recipientId = contactChannel?.externalId;
+        }
+
+        if (!recipientId) {
+            console.error(`[Automation] Could not resolve External ID for Contact ${context.contactId}`);
+            return;
+        }
+
         // 2. Wrap Links for Tracking
         let messageText = node.data.content;
         const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -723,7 +760,7 @@ export class AutomationService {
             const encodedUrl = encodeURIComponent(linkUrl);
             const trackingUrl = `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
 
-            await this.sendButtonMessage(context.contactId, context.workspaceId, cleanText, [
+            await this.sendButtonMessage(recipientId, context.workspaceId, cleanText, [
                 { type: 'web_url', url: trackingUrl, title: node.data.dmLinkText || "Visit Link" }
             ]);
 
@@ -740,7 +777,7 @@ export class AutomationService {
         // Fallback to text message
         try {
             const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
-            let recipient: any = { id: context.contactId };
+            let recipient: any = { id: recipientId };
 
             if (context.variables && context.variables.commentId) {
                 recipient = { comment_id: context.variables.commentId };
