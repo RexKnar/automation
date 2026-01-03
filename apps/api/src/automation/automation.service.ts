@@ -754,29 +754,6 @@ export class AutomationService {
         // The user said: "finally send the link with our message if possible link the link with a button"
         // If the message contains a link, we can convert it to a button template.
 
-        const links = messageText.match(urlRegex);
-        if (links && links.length > 0) {
-            const linkUrl = links[0];
-            const cleanText = messageText.replace(linkUrl, '').trim() || "Click the button below:";
-
-            const encodedUrl = encodeURIComponent(linkUrl);
-            const trackingUrl = `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
-
-            await this.sendButtonMessage(recipientId, context.workspaceId, cleanText, [
-                { type: 'web_url', url: trackingUrl, title: node.data.dmLinkText || "Visit Link" }
-            ]);
-
-            // Update Log
-            const log = await this.getOrCreateDeliveryLog(context.flowId, context.contactId, context.workspaceId);
-            await this.prisma.automationDeliveryLog.update({
-                where: { id: log.id },
-                data: { linkMsgSent: true }
-            });
-
-            return;
-        }
-
-        // Fallback to text message
         try {
             const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
             let recipient: any = { id: recipientId };
@@ -785,30 +762,86 @@ export class AutomationService {
                 recipient = { comment_id: context.variables.commentId };
             }
 
-            // const payload = {
-            //     recipient,
-            //     message: { text: messageText },
-            // };
+            const links = messageText.match(urlRegex);
 
-            const payload = {
-                recipient,
-                message: {
-                    attachment: {
-                        type: "template",
-                        payload: {
-                            template_type: "button",
-                            text: messageText,
-                            buttons: [
-                                {
-                                    type: "postback",
-                                    payload: "send_link_click",
-                                    title: "Send Link"
-                                },
-                            ]
+            let payload: any;
+            const lowerText = messageText.toLowerCase();
+
+            if (links && links.length > 0) {
+                // 1. Link Message
+                const linkUrl = links[0];
+                const cleanText = messageText.replace(linkUrl, '').trim() || "Click the button below:";
+                const encodedUrl = encodeURIComponent(linkUrl);
+                const trackingUrl = `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
+
+                payload = {
+                    recipient,
+                    message: {
+                        attachment: {
+                            type: "template",
+                            payload: {
+                                template_type: "button",
+                                text: cleanText,
+                                buttons: [
+                                    {
+                                        type: "web_url",
+                                        url: trackingUrl,
+                                        title: node.data.dmLinkText || "Open the link"
+                                    }
+                                ]
+                            }
                         }
                     }
-                },
-            };
+                };
+            } else if (lowerText.includes('follow')) {
+                // 2. Ask to Follow Message
+                payload = {
+                    recipient,
+                    message: {
+                        attachment: {
+                            type: "template",
+                            payload: {
+                                template_type: "button",
+                                text: messageText,
+                                buttons: [
+                                    {
+                                        type: "postback",
+                                        payload: "follow_confirmed",
+                                        title: "Followed"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                };
+            } else if (lowerText.includes('link') || lowerText.includes('send')) {
+                // 3. Opening Message (Send Link)
+                payload = {
+                    recipient,
+                    message: {
+                        attachment: {
+                            type: "template",
+                            payload: {
+                                template_type: "button",
+                                text: messageText,
+                                buttons: [
+                                    {
+                                        type: "postback",
+                                        payload: "send_link_click",
+                                        title: "Send Link"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                };
+            } else {
+                // 4. Standard Text Message
+                payload = {
+                    recipient,
+                    message: { text: messageText }
+                };
+            }
 
             await firstValueFrom(this.http.post(url, payload, {
                 headers: { Authorization: `Bearer ${accessToken}` }
