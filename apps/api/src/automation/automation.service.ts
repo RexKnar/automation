@@ -293,17 +293,28 @@ export class AutomationService {
             // Fallthrough to Keyword check
         } else {
             // Check for Pending Flow (Priority)
-            const pendingFlowId = (contact.customData as any)?.pendingFlowId;
-            if (pendingFlowId) {
-                const flow = await this.getFlow(pendingFlowId);
+            // Check for Pending Flow or Payload Flow ID
+            let flowId = (contact.customData as any)?.pendingFlowId;
+            let action = '';
+
+            const text = data.text?.toLowerCase() || '';
+            let payload = data.payload || '';
+
+            // Parse Unique Payload (ACTION:FLOW_ID)
+            if (payload.includes(':')) {
+                const parts = payload.split(':');
+                action = parts[0].toLowerCase();
+                flowId = parts[1]; // Override pending flow ID if present in payload
+            } else {
+                action = payload.toLowerCase();
+            }
+
+            if (flowId) {
+                const flow = await this.getFlow(flowId);
                 const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
 
-                // Handle Postbacks & Keywords for Flow Resume
-                const text = data.text?.toLowerCase() || '';
-                const payload = data.payload?.toLowerCase() || '';
-
-                if (payload === 'follow_confirmed' || text === 'followed') {
-                    console.log(`[Automation] Follow Confirmed`);
+                if (action === 'follow_confirmed' || text === 'followed') {
+                    console.log(`[Automation] Follow Confirmed for Flow ${flowId}`);
                     await this.prisma.contact.update({
                         where: { id: contact.id },
                         data: {
@@ -319,8 +330,8 @@ export class AutomationService {
                     return;
                 }
 
-                if (payload === 'send_link' || payload === 'send_link_click' || text === 'send_link') {
-                    console.log(`[Automation] Opening Button Clicked`);
+                if (action === 'send_link' || action === 'send_link_click' || text === 'send_link') {
+                    console.log(`[Automation] Opening Button Clicked for Flow ${flowId}`);
                     await this.prisma.automationDeliveryLog.update({
                         where: { id: log.id },
                         data: { openingClicked: true }
@@ -554,7 +565,7 @@ export class AutomationService {
                 if (!log.followMsgSent) {
                     console.log(`[Automation] Sending Follow Request to ${externalId}`);
                     const sent = await this.sendButtonMessage(externalId, flow.workspaceId, followDMText, [
-                        { type: 'postback', title: 'Done', payload: 'FOLLOW_CONFIRMED' }
+                        { type: 'postback', title: 'Done', payload: `FOLLOW_CONFIRMED:${flow.id}` }
                     ]);
 
                     if (sent) {
@@ -595,7 +606,7 @@ export class AutomationService {
                     const btnText = replyButtonText || "Send me the link";
 
                     await this.sendButtonMessage(externalId, flow.workspaceId, text, [
-                        { type: 'postback', title: btnText, payload: 'SEND_LINK' }
+                        { type: 'postback', title: btnText, payload: `SEND_LINK:${flow.id}` }
                     ]);
 
                     await this.prisma.automationDeliveryLog.update({
@@ -868,7 +879,7 @@ export class AutomationService {
                                 buttons: [
                                     {
                                         type: "postback",
-                                        payload: "follow_confirmed",
+                                        payload: `follow_confirmed:${context.flowId}`,
                                         title: "Followed"
                                     }
                                 ]
@@ -889,7 +900,7 @@ export class AutomationService {
                                 buttons: [
                                     {
                                         type: "postback",
-                                        payload: "send_link_click",
+                                        payload: `send_link_click:${context.flowId}`,
                                         title: "Send_Link"
                                     }
                                 ]
