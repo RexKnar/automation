@@ -190,6 +190,9 @@ export class MetaService {
 
         } catch (error) {
             console.error('Error fetching Instagram media:', error?.response?.data || error.message);
+            console.log(`https://graph.instagram.com/v21.0/${instagramAccountId}/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp&limit=${limit}`, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            });
             return [];
         }
     }
