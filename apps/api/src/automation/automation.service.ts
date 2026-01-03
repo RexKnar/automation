@@ -798,9 +798,9 @@ export class AutomationService {
                             text: messageText,
                             buttons: [
                                 {
-                                    "type": "postback",
-                                    "PAYLOAD": "send_link_click",
-                                    "title": "Send Link"
+                                    type: "postback",
+                                    payload: "send_link_click",
+                                    title: "Send Link"
                                 },
                             ]
                         }
