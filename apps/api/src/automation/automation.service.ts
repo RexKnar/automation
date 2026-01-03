@@ -786,7 +786,7 @@ export class AutomationService {
                                     {
                                         type: "web_url",
                                         url: trackingUrl,
-                                        title: node.data.dmLinkText || "Open the link"
+                                        title: "Open the link"
                                     }
                                 ]
                             }
