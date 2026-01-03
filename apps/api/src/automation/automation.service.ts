@@ -514,10 +514,7 @@ export class AutomationService {
             return;
         }
 
-        const flowId = (contact.customData as any).pendingFlowId;
-        const metadata = (contact.customData as any).pendingMetadata || {};
-
-        // 2. Clear pending state
+        // 2. Clear pending state & Mark as Follower
         await this.prisma.contact.update({
             where: { id: contact.id },
             data: {
