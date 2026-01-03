@@ -309,6 +309,8 @@ export class AutomationService {
                 action = payload.toLowerCase();
             }
 
+            console.log(`[Automation] Parsed Payload: Action="${action}", FlowId="${flowId}", OriginalPayload="${payload}"`);
+
             if (flowId) {
                 const flow = await this.getFlow(flowId);
                 const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
