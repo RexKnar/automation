@@ -99,6 +99,26 @@ export class AutomationService {
         });
     }
 
+    async getFlowStats(flowId: string) {
+        const logs = await this.prisma.automationDeliveryLog.findMany({
+            where: { flowId },
+        });
+
+        const stats = {
+            totalTriggered: logs.length,
+            followMsgSent: logs.filter(l => l.followMsgSent).length,
+            followConfirmed: logs.filter(l => l.followConfirmed).length,
+            openingMsgSent: logs.filter(l => l.openingMsgSent).length,
+            openingClicked: logs.filter(l => l.openingClicked).length,
+            emailReqSent: logs.filter(l => l.emailReqSent).length,
+            emailProvided: logs.filter(l => l.emailProvided).length,
+            linkMsgSent: logs.filter(l => l.linkMsgSent).length,
+            linkClicked: logs.filter(l => l.linkClicked).length,
+        };
+
+        return stats;
+    }
+
     // --- Execution Engine ---
 
     async handleIncomingComment(data: {
@@ -190,10 +210,12 @@ export class AutomationService {
         text: string;
         messageId: string;
         fromId: string;
+        isPostback?: boolean;
+        payload?: string;
     }) {
-        console.log(`[Automation] Handling Message from ${data.fromId}: "${data.text}"`);
+        console.log(`[Automation] Handling Message from ${data.fromId}: "${data.text}" (Postback: ${data.isPostback})`);
 
-        // 0. Check for Waiting States (Email Collection)
+        // 1. Identify Contact & Flow Context
         const contact = await this.prisma.contact.findFirst({
             where: {
                 channels: {
@@ -202,44 +224,82 @@ export class AutomationService {
                         channel: { type: 'INSTAGRAM' }
                     }
                 }
-            }
+            },
+            include: { channels: true }
         });
 
-        if (contact && (contact.customData as any)?.automationState === 'WAITING_FOR_EMAIL') {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (emailRegex.test(data.text.trim())) {
-                // Valid Email
-                await this.prisma.contact.update({
-                    where: { id: contact.id },
-                    data: {
-                        email: data.text.trim(),
-                        customData: {
-                            ...(contact.customData as any),
-                            automationState: null,
-                            pendingFlowId: null,
-                            pendingMetadata: null,
-                        }
+        if (!contact) {
+            // New contact, likely starting a flow via keyword
+            // Fallthrough to Keyword check
+        } else {
+            // Check for Pending Flow (Priority)
+            const pendingFlowId = (contact.customData as any)?.pendingFlowId;
+            if (pendingFlowId) {
+                const flow = await this.getFlow(pendingFlowId);
+                const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
+
+                // Handle Postbacks
+                if (data.isPostback) {
+                    if (data.payload === 'FOLLOW_CONFIRMED') {
+                        console.log(`[Automation] Follow Confirmed via Button`);
+                        await this.prisma.contact.update({
+                            where: { id: contact.id },
+                            data: {
+                                customData: { ...(contact.customData as any), isFollower: true }
+                            }
+                        });
+                        await this.prisma.automationDeliveryLog.update({
+                            where: { id: log.id },
+                            data: { followConfirmed: true }
+                        });
+                        // Resume
+                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        return;
                     }
-                });
 
-                // Resume Flow
-                const flowId = (contact.customData as any).pendingFlowId;
-                const metadata = (contact.customData as any).pendingMetadata || {};
-
-                if (flowId) {
-                    await this.triggerFlow(flowId, data.fromId, metadata);
+                    if (data.payload === 'SEND_LINK') {
+                        console.log(`[Automation] Opening Button Clicked`);
+                        await this.prisma.automationDeliveryLog.update({
+                            where: { id: log.id },
+                            data: { openingClicked: true }
+                        });
+                        // Resume
+                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        return;
+                    }
                 }
-                return;
-            } else {
-                // Invalid Email - Ask again
-                // We need workspaceId to send message.
-                // We can get it from contact.workspaceId
-                await this.sendEmailRequest(data.fromId, contact.workspaceId);
-                return;
+
+                // Handle Email Input
+                if ((contact.customData as any)?.automationState === 'WAITING_FOR_EMAIL') {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (emailRegex.test(data.text.trim())) {
+                        await this.prisma.contact.update({
+                            where: { id: contact.id },
+                            data: {
+                                email: data.text.trim(),
+                                customData: {
+                                    ...(contact.customData as any),
+                                    automationState: null, // Clear state
+                                }
+                            }
+                        });
+                        await this.prisma.automationDeliveryLog.update({
+                            where: { id: log.id },
+                            data: { emailProvided: true }
+                        });
+                        // Resume
+                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        return;
+                    } else {
+                        // Invalid Email - Ask again (optional, or just ignore)
+                        // For now, let's re-send request if needed or just wait
+                        return;
+                    }
+                }
             }
         }
 
-        // 1. Find all active flows triggered by KEYWORD
+        // 2. Find all active flows triggered by KEYWORD (if not handling pending)
         const potentialFlows = await this.prisma.flow.findMany({
             where: {
                 isActive: true,
@@ -247,46 +307,34 @@ export class AutomationService {
             },
         });
 
-        console.log(`[Automation] Found ${potentialFlows.length} active keyword flows.`);
-
         for (const flow of potentialFlows) {
             const nodes = flow.nodes as unknown as FlowNode[];
             const triggerNode = nodes.find(n => n.type === 'TRIGGER');
-
             if (!triggerNode) continue;
 
-            // Check Keywords
             const keywords = triggerNode.data.keywords || [];
             const messageText = data.text.toLowerCase();
-
             const hasKeyword = keywords.some((k: string) => messageText.includes(k.toLowerCase()));
 
-            if (!hasKeyword && keywords.length > 0) {
-                continue;
+            if (hasKeyword) {
+                console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
+
+                // Initial Log
+                await this.prisma.automationLog.create({
+                    data: {
+                        flowId: flow.id,
+                        workspaceId: flow.workspaceId,
+                        triggerType: 'KEYWORD',
+                        status: 'TRIGGERED',
+                        message: `Triggered by message from ${data.fromId}`,
+                        metadata: data,
+                    },
+                });
+
+                await this.triggerFlow(flow.id, data.fromId);
+                // Only trigger one flow per keyword match? For now, yes.
+                break;
             }
-
-            // Match Found! Trigger Flow
-            console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
-
-            // Check Gates
-            const canProceed = await this.checkGates(flow, data.fromId, {});
-            if (!canProceed) {
-                console.log(`[Automation] Flow "${flow.name}" gated. Stopping execution.`);
-                continue;
-            }
-
-            await this.prisma.automationLog.create({
-                data: {
-                    flowId: flow.id,
-                    workspaceId: flow.workspaceId,
-                    triggerType: 'KEYWORD',
-                    status: 'TRIGGERED',
-                    message: `Triggered by message from ${data.fromId}`,
-                    metadata: data,
-                },
-            });
-
-            await this.triggerFlow(flow.id, data.fromId);
         }
     }
 
@@ -404,55 +452,32 @@ export class AutomationService {
     }
 
     async checkGates(flow: any, contactId: string, context: any): Promise<boolean> {
-        // Check if flow requires Follow or Email
-        // Assuming these flags are in the Trigger Node data or Flow metadata
-        // Let's assume they are in the Trigger Node for now, or we can add them to Flow model.
-        // For this task, I'll check the Trigger Node data.
-
         const nodes = flow.nodes as unknown as FlowNode[];
         const triggerNode = nodes.find(n => n.type === 'TRIGGER');
-
         if (!triggerNode) return true;
 
-        const requireFollow = triggerNode.data.requireFollow;
-        const requireEmail = triggerNode.data.requireEmail;
+        const { requireFollow, openingDM, requireEmail, openingDMText, replyButtonText } = triggerNode.data;
 
-        if (!requireFollow && !requireEmail) return true;
-
-        // Fetch Contact
+        // Get Contact
         let contact = await this.prisma.contact.findFirst({
             where: {
-                channels: {
-                    some: {
-                        externalId: contactId,
-                        channel: { type: 'INSTAGRAM' }
-                    }
-                }
+                channels: { some: { externalId: contactId, channel: { type: 'INSTAGRAM' } } }
             },
             include: { channels: true }
         });
 
-        // If contact doesn't exist, create it (basic)
         if (!contact) {
-            // We need workspaceId. It's in the flow.
+            // Create Contact if missing
             const channel = await this.prisma.channel.findFirst({
                 where: { workspaceId: flow.workspaceId, type: 'INSTAGRAM' }
             });
-
-            if (!channel) {
-                console.error(`[Automation] No Instagram channel found for workspace ${flow.workspaceId} when creating contact.`);
-                return false;
-            }
+            if (!channel) return false;
 
             contact = await this.prisma.contact.create({
                 data: {
                     workspaceId: flow.workspaceId,
                     channels: {
-                        create: {
-                            channelId: channel.id,
-                            externalId: contactId,
-                            metadata: {}
-                        }
+                        create: { channelId: channel.id, externalId: contactId, metadata: {} }
                     },
                     customData: {}
                 },
@@ -460,15 +485,24 @@ export class AutomationService {
             });
         }
 
+        // Get Delivery Log
+        const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId);
+
         // 1. Follow Check
         if (requireFollow) {
-            const isFollower = (contact.customData as any)?.isFollower;
+            const isFollower = (contact.customData as any)?.isFollower || log.followConfirmed;
             if (!isFollower) {
-                console.log(`[Automation] User ${contactId} must follow first.`);
-                // Send Follow Request
-                await this.sendFollowRequest(contactId, flow.workspaceId);
-
-                // Save State
+                if (!log.followMsgSent) {
+                    console.log(`[Automation] Sending Follow Request to ${contactId}`);
+                    await this.sendButtonMessage(contactId, flow.workspaceId, "Please follow our page to continue.", [
+                        { type: 'postback', title: 'Done', payload: 'FOLLOW_CONFIRMED' }
+                    ]);
+                    await this.prisma.automationDeliveryLog.update({
+                        where: { id: log.id },
+                        data: { followMsgSent: true }
+                    });
+                }
+                // Save Pending State
                 await this.prisma.contact.update({
                     where: { id: contact.id },
                     data: {
@@ -484,19 +518,56 @@ export class AutomationService {
             }
         }
 
-        // 2. Email Check
-        if (requireEmail) {
-            if (!contact.email) {
-                console.log(`[Automation] User ${contactId} must provide email.`);
-                // Send Email Request
-                await this.sendEmailRequest(contactId, flow.workspaceId);
+        // 2. Opening Message (with "Send me the link" button)
+        if (openingDM) {
+            if (!log.openingClicked) {
+                if (!log.openingMsgSent) {
+                    console.log(`[Automation] Sending Opening Message to ${contactId}`);
+                    const text = openingDMText || "Hey there! Click below to get the link.";
+                    const btnText = replyButtonText || "Send me the link";
 
-                // Save State
+                    await this.sendButtonMessage(contactId, flow.workspaceId, text, [
+                        { type: 'postback', title: btnText, payload: 'SEND_LINK' }
+                    ]);
+
+                    await this.prisma.automationDeliveryLog.update({
+                        where: { id: log.id },
+                        data: { openingMsgSent: true }
+                    });
+                }
+                // Wait for click
                 await this.prisma.contact.update({
                     where: { id: contact.id },
                     data: {
                         customData: {
-                            ...(contact.customData as any || {}),
+                            ...(contact.customData as any),
+                            pendingFlowId: flow.id,
+                            pendingMetadata: context.variables,
+                            automationState: 'WAITING_FOR_OPENING_CLICK'
+                        }
+                    }
+                });
+                return false;
+            }
+        }
+
+        // 3. Email Check
+        if (requireEmail) {
+            if (!contact.email && !log.emailProvided) {
+                if (!log.emailReqSent) {
+                    console.log(`[Automation] Sending Email Request to ${contactId}`);
+                    await this.sendEmailRequest(contactId, flow.workspaceId);
+                    await this.prisma.automationDeliveryLog.update({
+                        where: { id: log.id },
+                        data: { emailReqSent: true }
+                    });
+                }
+                // Wait for email
+                await this.prisma.contact.update({
+                    where: { id: contact.id },
+                    data: {
+                        customData: {
+                            ...(contact.customData as any),
                             pendingFlowId: flow.id,
                             pendingMetadata: context.variables,
                             automationState: 'WAITING_FOR_EMAIL'
@@ -507,15 +578,11 @@ export class AutomationService {
             }
         }
 
+        // All gates passed!
         return true;
     }
 
-    async sendFollowRequest(contactId: string, workspaceId: string) {
-        // Send a message with a "Done" button
-        // We need to construct a Button Template message
-        // Since `sendMessage` currently handles text, we need to bypass it or update it.
-        // I'll implement a raw send here for simplicity.
-
+    async sendButtonMessage(contactId: string, workspaceId: string, text: string, buttons: any[]) {
         const channel = await this.prisma.channel.findFirst({
             where: { workspaceId, type: 'INSTAGRAM', isActive: true }
         });
@@ -532,14 +599,8 @@ export class AutomationService {
                     type: "template",
                     payload: {
                         template_type: "button",
-                        text: "Please follow our page to continue.",
-                        buttons: [
-                            {
-                                type: "postback",
-                                title: "Done",
-                                payload: "FOLLOW_CONFIRMED"
-                            }
-                        ]
+                        text: text,
+                        buttons: buttons
                     }
                 }
             }
@@ -550,7 +611,7 @@ export class AutomationService {
                 headers: { Authorization: `Bearer ${accessToken}` }
             }));
         } catch (e) {
-            console.error('Failed to send follow request:', e.response?.data || e.message);
+            console.error('Failed to send button message:', e.response?.data || e.message);
         }
     }
 
@@ -580,26 +641,53 @@ export class AutomationService {
         }
     }
 
+    async getOrCreateDeliveryLog(flowId: string, contactId: string, workspaceId: string) {
+        let log = await this.prisma.automationDeliveryLog.findFirst({
+            where: { flowId, contactId },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        // Create new log if none exists or if the last one is "complete" (logic depends on requirements, for now just one per flow/contact or create new if old)
+        // For simplicity, let's create a new one if the last one is older than X or if we want to track every run.
+        // But checkGates needs to find the *current* run.
+        // Let's assume we reuse the existing one if it's not fully complete, or create new.
+        // For this task, I'll just findFirst or create.
+
+        if (!log) {
+            log = await this.prisma.automationDeliveryLog.create({
+                data: { flowId, contactId, workspaceId }
+            });
+        }
+        return log;
+    }
+
     async trackClick(flowId: string, nodeId: string, contactId: string) {
         console.log(`[Automation] Tracking click for Flow ${flowId}, Node ${nodeId}, Contact ${contactId}`);
 
         // 1. Update Flow Stats
         await this.prisma.flowStats.upsert({
             where: { flowId },
-            create: {
-                flowId,
-                clicks: 1,
-            },
-            update: {
-                clicks: { increment: 1 },
-            },
+            create: { flowId, clicks: 1 },
+            update: { clicks: { increment: 1 } },
         });
 
-        // 2. Log Event
+        // 2. Update Delivery Log
+        const log = await this.prisma.automationDeliveryLog.findFirst({
+            where: { flowId, contactId },
+            orderBy: { createdAt: 'desc' }
+        });
+        if (log) {
+            await this.prisma.automationDeliveryLog.update({
+                where: { id: log.id },
+                data: { linkClicked: true }
+            });
+        }
+
+        // 3. Log Event
         await this.prisma.automationLog.create({
             data: {
                 flowId,
-                workspaceId: (await this.getFlow(flowId)).workspaceId, // Fetching flow again might be expensive, but safe
+                workspaceId: (await this.getFlow(flowId)).workspaceId,
                 triggerType: 'LINK_CLICK',
                 status: 'SUCCESS',
                 message: `Link clicked by ${contactId}`,
@@ -611,15 +699,8 @@ export class AutomationService {
     private async sendMessage(node: FlowNode, context: ExecutionContext) {
         console.log(`[Automation] Sending Message: "${node.data.content}" to ${context.contactId}`);
 
-        // 1. Get Channel Access Token
-        // We assume the flow is associated with a specific channel type (INSTAGRAM)
-        // In a real scenario, we might want to pass the specific channel ID in the context or flow
         const channel = await this.prisma.channel.findFirst({
-            where: {
-                workspaceId: context.workspaceId,
-                type: 'INSTAGRAM',
-                isActive: true,
-            },
+            where: { workspaceId: context.workspaceId, type: 'INSTAGRAM', isActive: true },
         });
 
         if (!channel || !channel.config || !(channel.config as any).accessToken) {
@@ -635,19 +716,37 @@ export class AutomationService {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const apiUrl = this.config.get<string>('API_URL') || 'https://rexocialapi.rexcoders.in';
 
-        messageText = messageText.replace(urlRegex, (url) => {
-            const encodedUrl = encodeURIComponent(url);
-            return `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
-        });
+        // Check if we should send as Button Template (if it's the final link message)
+        // The user said: "finally send the link with our message if possible link the link with a button"
+        // If the message contains a link, we can convert it to a button template.
 
-        // 3. Send Message via Graph API
+        const links = messageText.match(urlRegex);
+        if (links && links.length > 0) {
+            const linkUrl = links[0];
+            const cleanText = messageText.replace(linkUrl, '').trim() || "Click the button below:";
+
+            const encodedUrl = encodeURIComponent(linkUrl);
+            const trackingUrl = `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
+
+            await this.sendButtonMessage(context.contactId, context.workspaceId, cleanText, [
+                { type: 'web_url', url: trackingUrl, title: node.data.dmLinkText || "Visit Link" }
+            ]);
+
+            // Update Log
+            const log = await this.getOrCreateDeliveryLog(context.flowId, context.contactId, context.workspaceId);
+            await this.prisma.automationDeliveryLog.update({
+                where: { id: log.id },
+                data: { linkMsgSent: true }
+            });
+
+            return;
+        }
+
+        // Fallback to text message
         try {
             const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
-
-            // Construct payload based on node content
             let recipient: any = { id: context.contactId };
 
-            // Handle Private Reply (if commentId exists in context)
             if (context.variables && context.variables.commentId) {
                 recipient = { comment_id: context.variables.commentId };
             }
@@ -657,12 +756,17 @@ export class AutomationService {
                 message: { text: messageText },
             };
 
-            console.log(`[Automation] Payload:`, JSON.stringify(payload, null, 2));
-
             await firstValueFrom(this.http.post(url, payload, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             }));
             console.log(`[Automation] Message sent successfully to ${context.contactId}`);
+
+            // Update Log
+            const log = await this.getOrCreateDeliveryLog(context.flowId, context.contactId, context.workspaceId);
+            await this.prisma.automationDeliveryLog.update({
+                where: { id: log.id },
+                data: { linkMsgSent: true } // Assuming this is the final message
+            });
 
             await this.prisma.automationLog.create({
                 data: {
@@ -676,7 +780,6 @@ export class AutomationService {
             });
         } catch (error) {
             console.error(`[Automation] Failed to send message:`, error?.response?.data || error.message);
-
             await this.prisma.automationLog.create({
                 data: {
                     flowId: context.flowId,
