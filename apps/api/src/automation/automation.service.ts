@@ -164,6 +164,13 @@ export class AutomationService {
             // Match Found! Trigger Flow
             console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
 
+            // Check Gates (Follow / Email)
+            const canProceed = await this.checkGates(flow, data.fromId, { commentId: data.commentId });
+            if (!canProceed) {
+                console.log(`[Automation] Flow "${flow.name}" gated. Stopping execution.`);
+                continue;
+            }
+
             await this.prisma.automationLog.create({
                 data: {
                     flowId: flow.id,
@@ -185,6 +192,52 @@ export class AutomationService {
         fromId: string;
     }) {
         console.log(`[Automation] Handling Message from ${data.fromId}: "${data.text}"`);
+
+        // 0. Check for Waiting States (Email Collection)
+        const contact = await this.prisma.contact.findFirst({
+            where: {
+                channels: {
+                    some: {
+                        externalId: data.fromId,
+                        channel: { type: 'INSTAGRAM' }
+                    }
+                }
+            }
+        });
+
+        if (contact && (contact.customData as any)?.automationState === 'WAITING_FOR_EMAIL') {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailRegex.test(data.text.trim())) {
+                // Valid Email
+                await this.prisma.contact.update({
+                    where: { id: contact.id },
+                    data: {
+                        email: data.text.trim(),
+                        customData: {
+                            ...(contact.customData as any),
+                            automationState: null,
+                            pendingFlowId: null,
+                            pendingMetadata: null,
+                        }
+                    }
+                });
+
+                // Resume Flow
+                const flowId = (contact.customData as any).pendingFlowId;
+                const metadata = (contact.customData as any).pendingMetadata || {};
+
+                if (flowId) {
+                    await this.triggerFlow(flowId, data.fromId, metadata);
+                }
+                return;
+            } else {
+                // Invalid Email - Ask again
+                // We need workspaceId to send message.
+                // We can get it from contact.workspaceId
+                await this.sendEmailRequest(data.fromId, contact.workspaceId);
+                return;
+            }
+        }
 
         // 1. Find all active flows triggered by KEYWORD
         const potentialFlows = await this.prisma.flow.findMany({
@@ -214,6 +267,13 @@ export class AutomationService {
 
             // Match Found! Trigger Flow
             console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
+
+            // Check Gates
+            const canProceed = await this.checkGates(flow, data.fromId, {});
+            if (!canProceed) {
+                console.log(`[Automation] Flow "${flow.name}" gated. Stopping execution.`);
+                continue;
+            }
 
             await this.prisma.automationLog.create({
                 data: {
@@ -300,6 +360,254 @@ export class AutomationService {
         }
     }
 
+    async handleFollowConfirmation(contactId: string) {
+        console.log(`[Automation] Follow confirmed for ${contactId}`);
+        // 1. Find pending flow for this contact
+        // We need to store the pending flow ID in the contact's customData or metadata
+        // For now, let's assume we store it in `customData.pendingFlowId`
+
+        const contact = await this.prisma.contact.findFirst({
+            where: {
+                channels: {
+                    some: {
+                        externalId: contactId,
+                        channel: { type: 'INSTAGRAM' }
+                    }
+                }
+            }
+        });
+
+        if (!contact || !contact.customData || !(contact.customData as any).pendingFlowId) {
+            console.log('[Automation] No pending flow found for follow confirmation.');
+            return;
+        }
+
+        const flowId = (contact.customData as any).pendingFlowId;
+        const metadata = (contact.customData as any).pendingMetadata || {};
+
+        // 2. Clear pending state
+        await this.prisma.contact.update({
+            where: { id: contact.id },
+            data: {
+                customData: {
+                    ...(contact.customData as any),
+                    pendingFlowId: null,
+                    pendingMetadata: null,
+                    automationState: null, // Clear state
+                    isFollower: true, // Mark as follower (trusted)
+                }
+            }
+        });
+
+        // 3. Resume Flow (Trigger it again, checkGates will now pass)
+        await this.triggerFlow(flowId, contactId, metadata);
+    }
+
+    async checkGates(flow: any, contactId: string, context: any): Promise<boolean> {
+        // Check if flow requires Follow or Email
+        // Assuming these flags are in the Trigger Node data or Flow metadata
+        // Let's assume they are in the Trigger Node for now, or we can add them to Flow model.
+        // For this task, I'll check the Trigger Node data.
+
+        const nodes = flow.nodes as unknown as FlowNode[];
+        const triggerNode = nodes.find(n => n.type === 'TRIGGER');
+
+        if (!triggerNode) return true;
+
+        const requireFollow = triggerNode.data.requireFollow;
+        const requireEmail = triggerNode.data.requireEmail;
+
+        if (!requireFollow && !requireEmail) return true;
+
+        // Fetch Contact
+        let contact = await this.prisma.contact.findFirst({
+            where: {
+                channels: {
+                    some: {
+                        externalId: contactId,
+                        channel: { type: 'INSTAGRAM' }
+                    }
+                }
+            },
+            include: { channels: true }
+        });
+
+        // If contact doesn't exist, create it (basic)
+        if (!contact) {
+            // We need workspaceId. It's in the flow.
+            const channel = await this.prisma.channel.findFirst({
+                where: { workspaceId: flow.workspaceId, type: 'INSTAGRAM' }
+            });
+
+            if (!channel) {
+                console.error(`[Automation] No Instagram channel found for workspace ${flow.workspaceId} when creating contact.`);
+                return false;
+            }
+
+            contact = await this.prisma.contact.create({
+                data: {
+                    workspaceId: flow.workspaceId,
+                    channels: {
+                        create: {
+                            channelId: channel.id,
+                            externalId: contactId,
+                            metadata: {}
+                        }
+                    },
+                    customData: {}
+                },
+                include: { channels: true }
+            });
+        }
+
+        // 1. Follow Check
+        if (requireFollow) {
+            const isFollower = (contact.customData as any)?.isFollower;
+            if (!isFollower) {
+                console.log(`[Automation] User ${contactId} must follow first.`);
+                // Send Follow Request
+                await this.sendFollowRequest(contactId, flow.workspaceId);
+
+                // Save State
+                await this.prisma.contact.update({
+                    where: { id: contact.id },
+                    data: {
+                        customData: {
+                            ...(contact.customData as any),
+                            pendingFlowId: flow.id,
+                            pendingMetadata: context.variables,
+                            automationState: 'WAITING_FOR_FOLLOW'
+                        }
+                    }
+                });
+                return false;
+            }
+        }
+
+        // 2. Email Check
+        if (requireEmail) {
+            if (!contact.email) {
+                console.log(`[Automation] User ${contactId} must provide email.`);
+                // Send Email Request
+                await this.sendEmailRequest(contactId, flow.workspaceId);
+
+                // Save State
+                await this.prisma.contact.update({
+                    where: { id: contact.id },
+                    data: {
+                        customData: {
+                            ...(contact.customData as any || {}),
+                            pendingFlowId: flow.id,
+                            pendingMetadata: context.variables,
+                            automationState: 'WAITING_FOR_EMAIL'
+                        }
+                    }
+                });
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    async sendFollowRequest(contactId: string, workspaceId: string) {
+        // Send a message with a "Done" button
+        // We need to construct a Button Template message
+        // Since `sendMessage` currently handles text, we need to bypass it or update it.
+        // I'll implement a raw send here for simplicity.
+
+        const channel = await this.prisma.channel.findFirst({
+            where: { workspaceId, type: 'INSTAGRAM', isActive: true }
+        });
+        if (!channel) return;
+
+        const accessToken = (channel.config as any).accessToken;
+        const pageId = (channel.config as any).metaBusinessId;
+        const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
+
+        const payload = {
+            recipient: { id: contactId },
+            message: {
+                attachment: {
+                    type: "template",
+                    payload: {
+                        template_type: "button",
+                        text: "Please follow our page to continue.",
+                        buttons: [
+                            {
+                                type: "postback",
+                                title: "Done",
+                                payload: "FOLLOW_CONFIRMED"
+                            }
+                        ]
+                    }
+                }
+            }
+        };
+
+        try {
+            await firstValueFrom(this.http.post(url, payload, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            }));
+        } catch (e) {
+            console.error('Failed to send follow request:', e.response?.data || e.message);
+        }
+    }
+
+    async sendEmailRequest(contactId: string, workspaceId: string) {
+        const channel = await this.prisma.channel.findFirst({
+            where: { workspaceId, type: 'INSTAGRAM', isActive: true }
+        });
+        if (!channel) return;
+
+        const accessToken = (channel.config as any).accessToken;
+        const pageId = (channel.config as any).metaBusinessId;
+        const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
+
+        const payload = {
+            recipient: { id: contactId },
+            message: {
+                text: "Please provide your email address to continue."
+            }
+        };
+
+        try {
+            await firstValueFrom(this.http.post(url, payload, {
+                headers: { Authorization: `Bearer ${accessToken}` }
+            }));
+        } catch (e) {
+            console.error('Failed to send email request:', e.response?.data || e.message);
+        }
+    }
+
+    async trackClick(flowId: string, nodeId: string, contactId: string) {
+        console.log(`[Automation] Tracking click for Flow ${flowId}, Node ${nodeId}, Contact ${contactId}`);
+
+        // 1. Update Flow Stats
+        await this.prisma.flowStats.upsert({
+            where: { flowId },
+            create: {
+                flowId,
+                clicks: 1,
+            },
+            update: {
+                clicks: { increment: 1 },
+            },
+        });
+
+        // 2. Log Event
+        await this.prisma.automationLog.create({
+            data: {
+                flowId,
+                workspaceId: (await this.getFlow(flowId)).workspaceId, // Fetching flow again might be expensive, but safe
+                triggerType: 'LINK_CLICK',
+                status: 'SUCCESS',
+                message: `Link clicked by ${contactId}`,
+                metadata: { nodeId },
+            },
+        });
+    }
+
     private async sendMessage(node: FlowNode, context: ExecutionContext) {
         console.log(`[Automation] Sending Message: "${node.data.content}" to ${context.contactId}`);
 
@@ -319,36 +627,21 @@ export class AutomationService {
             return;
         }
 
-
-
         const accessToken = (channel.config as any).accessToken;
         const pageId = (channel.config as any).metaBusinessId;
 
+        // 2. Wrap Links for Tracking
+        let messageText = node.data.content;
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const apiUrl = this.config.get<string>('API_URL') || 'https://rexocialapi.rexcoders.in';
 
+        messageText = messageText.replace(urlRegex, (url) => {
+            const encodedUrl = encodeURIComponent(url);
+            return `${apiUrl}/automation/track/${context.flowId}/${node.id}?contactId=${context.contactId}&url=${encodedUrl}`;
+        });
 
-        // 2. Send Message via Graph API
+        // 3. Send Message via Graph API
         try {
-            // Debug: Check Permissions and Token Info
-            try {
-                const appId = this.config.get<string>('FACEBOOK_APP_ID');
-                const appSecret = this.config.get<string>('FACEBOOK_APP_SECRET');
-                console.log(`[Automation] Token Debug Info:`, JSON.stringify(accessToken, null, 2));
-                console.log(`[Automation] Token Debug Info:`, JSON.stringify({
-                    input_token: accessToken,
-                    access_token: `${appId}|${appSecret}` // App Access Token required for debug_token
-                }, null, 2));
-
-                const debugResponse = await firstValueFrom(this.http.get(`https://graph.instagram.com/v21.0/debug_token`, {
-                    params: {
-                        input_token: accessToken,
-                        access_token: `${appId}|${appSecret}` // App Access Token required for debug_token
-                    }
-                }));
-                console.log(`[Automation] Token Debug Info:`, JSON.stringify(debugResponse.data, null, 2));
-            } catch (permError) {
-                console.error(`[Automation] Failed to check token info:`, permError.message);
-            }
-
             const url = `https://graph.instagram.com/v21.0/${pageId}/messages`;
 
             // Construct payload based on node content
@@ -361,7 +654,7 @@ export class AutomationService {
 
             const payload = {
                 recipient,
-                message: { text: node.data.content },
+                message: { text: messageText },
             };
 
             console.log(`[Automation] Payload:`, JSON.stringify(payload, null, 2));
@@ -378,7 +671,7 @@ export class AutomationService {
                     triggerType: 'ACTION',
                     status: 'SUCCESS',
                     message: `Sent DM to ${context.contactId}`,
-                    metadata: { nodeId: node.id, content: node.data.content },
+                    metadata: { nodeId: node.id, content: messageText },
                 },
             });
         } catch (error) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft, Info, MessageCircle, MoreHorizontal, Send, Heart, Bookmark, Share2, Plus, Link as LinkIcon, AlertCircle } from "lucide-react";
+import { ArrowLeft, Info, MessageCircle, MoreHorizontal, Send, Heart, Bookmark, Share2, Plus, Link as LinkIcon, AlertCircle, Phone, Video, Mic, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -600,11 +600,146 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="dm" className="flex-1 m-0 bg-black p-4">
-                        <div className="text-center text-zinc-500 mt-20">
-                            DM Preview
+                        {/* DM Header */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
+                            <div className="flex items-center gap-3">
+                                <ArrowLeft className="w-6 h-6" onClick={() => setActiveTab("comments")} />
+                                <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px]">
+                                        <div className="w-full h-full rounded-full bg-black"></div>
+                                    </div>
+                                    <span className="font-bold text-sm">rexcoders</span>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <Phone className="w-6 h-6" />
+                                <Video className="w-6 h-6" />
+                            </div>
                         </div>
-                    </TabsContent>
+
+                        {/* DM Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                            <div className="text-center text-xs text-zinc-500 my-4">
+                                {new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </div>
+
+                            {/* Opening DM */}
+                            {openingDM && (
+                                <div className="flex flex-col items-start gap-1 animate-in fade-in slide-in-from-left-2 duration-300">
+                                    <div className="flex items-end gap-2 max-w-[85%]">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px] flex-shrink-0 mb-1">
+                                            <div className="w-full h-full rounded-full bg-black"></div>
+                                        </div>
+                                        <div className="bg-zinc-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm">
+                                            {openingDMText || "Hey there! Thanks for your interest!"}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Reply Button (Quick Reply Simulation) */}
+                                    {replyButtonText && (
+                                        <div className="ml-9 mt-1">
+                                            <div className="bg-transparent border border-zinc-700 text-blue-500 rounded-full px-4 py-1.5 text-sm font-semibold cursor-pointer hover:bg-zinc-900 transition-colors">
+                                                {replyButtonText}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Follow Reminder */}
+                            {askFollow && (
+                                <div className="flex flex-col items-start gap-1 animate-in fade-in slide-in-from-left-2 duration-300 delay-100">
+                                    <div className="flex items-end gap-2 max-w-[85%]">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px] flex-shrink-0 mb-1">
+                                            <div className="w-full h-full rounded-full bg-black"></div>
+                                        </div>
+                                        <div className="bg-zinc-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm">
+                                            Please follow our page to continue.
+                                        </div>
+                                    </div>
+                                    <div className="ml-9 mt-1">
+                                        <div className="bg-transparent border border-zinc-700 text-blue-500 rounded-full px-4 py-1.5 text-sm font-semibold cursor-pointer hover:bg-zinc-900 transition-colors">
+                                            Done
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Email Collection */}
+                            {askEmail && (
+                                <div className="flex flex-col items-start gap-1 animate-in fade-in slide-in-from-left-2 duration-300 delay-200">
+                                    <div className="flex items-end gap-2 max-w-[85%]">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px] flex-shrink-0 mb-1">
+                                            <div className="w-full h-full rounded-full bg-black"></div>
+                                        </div>
+                                        <div className="bg-zinc-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm">
+                                            Please provide your email address to continue.
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* DM with Link */}
+                            {(dmLinkText || linkUrl) && (
+                                <div className="flex flex-col items-start gap-1 animate-in fade-in slide-in-from-left-2 duration-300 delay-300">
+                                    <div className="flex items-end gap-2 max-w-[85%]">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px] flex-shrink-0 mb-1">
+                                            <div className="w-full h-full rounded-full bg-black"></div>
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            {dmLinkText && (
+                                                <div className="bg-zinc-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm">
+                                                    {dmLinkText}
+                                                </div>
+                                            )}
+                                            
+                                            {linkUrl && (
+                                                <div className="bg-zinc-800 rounded-xl overflow-hidden max-w-[240px] border border-zinc-700">
+                                                    <div className="h-32 bg-zinc-700 flex items-center justify-center relative">
+                                                        {/* Placeholder for Link Preview Image */}
+                                                        <LinkIcon className="w-8 h-8 text-zinc-500" />
+                                                    </div>
+                                                    <div className="p-3 bg-zinc-800">
+                                                        <div className="text-xs text-zinc-400 truncate">{new URL(linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`).hostname}</div>
+                                                        <div className="font-semibold text-sm truncate">Link Preview</div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {/* Follow Up DM */}
+                            {followUpDM && (
+                                <div className="flex flex-col items-start gap-1 animate-in fade-in slide-in-from-left-2 duration-300 delay-500 opacity-50">
+                                    <div className="flex items-end gap-2 max-w-[85%]">
+                                        <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-yellow-400 to-purple-600 p-[1px] flex-shrink-0 mb-1">
+                                            <div className="w-full h-full rounded-full bg-black"></div>
+                                        </div>
+                                        <div className="bg-zinc-800 rounded-2xl rounded-bl-none px-4 py-2 text-sm">
+                                            (Follow up message sent after delay)
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Message Input */}
+                        <div className="p-3 border-t border-zinc-800 flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-zinc-800 flex items-center justify-center">
+                                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                    <Plus className="w-3 h-3 text-black" />
+                                </div>
+                            </div>
+                            <div className="flex-1 bg-zinc-900 rounded-full h-10 px-4 flex items-center text-sm text-zinc-500 justify-between">
+                                <span>Message...</span>
+                                <div className="flex gap-2">
+                                    <Mic className="w-5 h-5 opacity-50" />
+                                    <ImageIcon className="w-5 h-5 opacity-50" />
+                                </div>
+                            </div>
+                        </div>
                 </Tabs>
             </div>
             

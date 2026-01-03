@@ -388,6 +388,10 @@ export class MetaService {
                     if (messaging.message && !messaging.message.is_echo) {
                         await this.handleInstagramMessage(messaging);
                     }
+                    // Handle Postbacks (Buttons)
+                    if (messaging.postback) {
+                        await this.handlePostback(messaging);
+                    }
                 }
 
                 for (const change of entry.changes || []) {
@@ -431,6 +435,68 @@ export class MetaService {
 
     async connectManually(userId: string, accessToken: string) {
         // Implementation pending
+    }
+
+    async checkInstagramFollow(userId: string, pageId: string, accessToken: string): Promise<boolean> {
+        // Note: The Graph API does not provide a direct "is following" endpoint for Business Accounts checking Users easily without specific permissions or scope.
+        // However, for Instagram Business Accounts, we can check if a user follows the business using the Business Discovery or Relationship endpoints if we have the user's token, OR
+        // we can try to get the user's profile and see if we can deduce it, but usually it's restricted.
+
+        // BUT, for this specific requirement ("if the user is not following the page"), we usually need `instagram_manage_comments` or similar to interact.
+        // A common workaround is to use the `GET /{ig-user-id}` and check if the business account is in their following list? No, that's private.
+
+        // Actually, there isn't a clean "check if User X follows Page Y" endpoint for Instagram Messaging bots unless you have the User's User Access Token.
+        // Since we are a bot interacting via DM, we only have the Page Access Token and the User's PSID (IGSID).
+
+        // WAIT: There is no public API to check if an arbitrary IGSID follows the Business Account using ONLY the Page Token.
+        // This is a known limitation.
+        // HOWEVER, many bots do this. How?
+        // They might just ASK the user.
+        // OR, if the user has granted permissions via Login, we can check.
+        // But for a random commenter, we can't strictly verify it via API without their token.
+
+        // Let's assume for this task that we might not be able to STRICTLY verify it via API for *every* user.
+        // BUT, if we assume we can't, then the feature "ask them to follow... then click done" relies on TRUST or a workaround.
+        // Workaround: We can't verify. We just ask. If they click "Done", we assume they did it (or we can't stop them).
+        // UNLESS we are using the Private Replies API which allows us to see some info? No.
+
+        // Let's try to implement a best-effort check or just return true if we can't verify.
+        // Actually, if the requirement is strict, we might be stuck.
+        // But let's look at `GET /{ig-business-id}/followers`? No, that list is huge and paginated.
+
+        // Let's implement a mock check or a "trust" based check for now, 
+        // OR if there is a specific endpoint I missed.
+        // `GET /v21.0/{ig-business-id}/followers?user_id={user-id}`? No.
+
+        // Re-reading docs: "You cannot check if a user follows your IG business account via the API unless you have the user's access token."
+        // So, for a DM bot, we CANNOT verify this technically.
+        // The feature request says: "ask them to follow ... and then click done ... after that we need to send them the actual link".
+        // This implies the "Done" button is the trigger. We might just have to trust them.
+        // OR, maybe the user implies we SHOULD verify.
+        // I will implement a "soft" check (just trust the button click) but I will add a comment about this limitation.
+        // Wait, if I can't verify, then `checkInstagramFollow` will always return false initially, and then we rely on the button?
+        // No, the button click IS the verification that they *claim* they followed.
+
+        // So `checkInstagramFollow` is effectively "Has the user clicked 'Done' or do we know they follow?"
+        // Since we can't know they follow via API, we only know if they clicked 'Done'.
+        // But `checkInstagramFollow` is supposed to be the API check.
+        // I will implement it to return `false` (assuming we don't know), so the bot ALWAYS asks.
+        // UNLESS we have marked them as "followed" in our DB.
+
+        return false;
+    }
+
+    async handlePostback(messaging: any) {
+        console.log('Processing Postback:', messaging);
+        // messaging structure: { sender: { id }, recipient: { id }, timestamp, postback: { title, payload, mid } }
+
+        const payload = messaging.postback.payload;
+        const fromId = messaging.sender.id;
+
+        if (payload === 'FOLLOW_CONFIRMED') {
+            // User clicked "Done"
+            await this.automationService.handleFollowConfirmation(fromId);
+        }
     }
 
     async disconnectMeta(userId: string) {
