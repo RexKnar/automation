@@ -33,6 +33,16 @@ export class AutomationService {
             throw new NotFoundException('Workspace not found or access denied');
         }
 
+        // Debug: Check Trigger Node Data
+        if (data.nodes) {
+            const triggerNode = data.nodes.find((n: any) => n.type === 'TRIGGER');
+            if (triggerNode) {
+                console.log(`[Automation] Creating Flow - Trigger Data:`, JSON.stringify(triggerNode.data, null, 2));
+            } else {
+                console.log(`[Automation] Creating Flow - No Trigger Node found.`);
+            }
+        }
+
         return this.prisma.flow.create({
             data: {
                 name: data.name,
@@ -79,6 +89,14 @@ export class AutomationService {
     }
 
     async updateFlow(id: string, data: any) {
+        // Debug: Check Trigger Node Data on Update
+        if (data.nodes) {
+            const triggerNode = data.nodes.find((n: any) => n.type === 'TRIGGER');
+            if (triggerNode) {
+                console.log(`[Automation] Updating Flow ${id} - Trigger Data:`, JSON.stringify(triggerNode.data, null, 2));
+            }
+        }
+
         return this.prisma.flow.update({
             where: { id },
             data,
@@ -490,7 +508,7 @@ export class AutomationService {
         const triggerNode = nodes.find(n => n.type === 'TRIGGER');
         if (!triggerNode) return true;
 
-        const { requireFollow, openingDM, requireEmail, openingDMText, replyButtonText } = triggerNode.data;
+
 
         // Resolve externalId for sending messages
         const channel = contact.channels.find((c: any) => c.channel && c.channel.type === 'INSTAGRAM');
@@ -501,22 +519,46 @@ export class AutomationService {
             return false;
         }
 
+        // Detect Gate Configuration from Nodes
+        const followNode = nodes.find(n => n.id.toLowerCase().includes('request_follow_dm') || n.data.messageType === 'request_follow_dm');
+        const openingNode = nodes.find(n => n.id.toLowerCase().includes('opening_dm') || n.data.messageType === 'opening_dm');
+        const emailNode = nodes.find(n => n.id.toLowerCase().includes('email_request_dm') || n.data.messageType === 'email_request_dm');
+
+        const requireFollow = !!followNode || triggerNode.data.requireFollow;
+        const openingDM = !!openingNode || triggerNode.data.openingDM;
+        const requireEmail = !!emailNode || triggerNode.data.requireEmail;
+
+        const openingDMText = openingNode?.data?.content || triggerNode.data.openingDMText;
+        const replyButtonText = openingNode?.data?.buttons?.[0]?.label || triggerNode.data.replyButtonText;
+        const followDMText = followNode?.data?.content || "Please follow our page to continue.";
+
         // Get Delivery Log
         const log = await this.getOrCreateDeliveryLog(flow.id, contact.id, flow.workspaceId, isNewExecution);
 
         // 1. Follow Check
         if (requireFollow) {
             const isFollower = (contact.customData as any)?.isFollower || log.followConfirmed;
+            console.log(`[Automation] Follow Check: Contact ${contact.id}, isFollower=${isFollower}, log.followConfirmed=${log.followConfirmed}`);
+
             if (!isFollower) {
                 if (!log.followMsgSent) {
                     console.log(`[Automation] Sending Follow Request to ${externalId}`);
-                    await this.sendButtonMessage(externalId, flow.workspaceId, "Please follow our page to continue.", [
+                    const sent = await this.sendButtonMessage(externalId, flow.workspaceId, followDMText, [
                         { type: 'postback', title: 'Done', payload: 'FOLLOW_CONFIRMED' }
                     ]);
-                    await this.prisma.automationDeliveryLog.update({
-                        where: { id: log.id },
-                        data: { followMsgSent: true }
-                    });
+
+                    if (sent) {
+                        await this.prisma.automationDeliveryLog.update({
+                            where: { id: log.id },
+                            data: { followMsgSent: true }
+                        });
+                    } else {
+                        console.error(`[Automation] Failed to send Follow Request to ${externalId}`);
+                        // Do not return false here, maybe we should retry or just stop?
+                        // If we return false, we stop. If we continue, we skip the gate (bad).
+                        // So we return false, effectively blocking the flow until it works.
+                        return false;
+                    }
                 }
                 // Save Pending State
                 await this.prisma.contact.update({
@@ -598,11 +640,11 @@ export class AutomationService {
         return true;
     }
 
-    async sendButtonMessage(contactId: string, workspaceId: string, text: string, buttons: any[]) {
+    async sendButtonMessage(contactId: string, workspaceId: string, text: string, buttons: any[]): Promise<boolean> {
         const channel = await this.prisma.channel.findFirst({
             where: { workspaceId, type: 'INSTAGRAM', isActive: true }
         });
-        if (!channel) return;
+        if (!channel) return false;
 
         const accessToken = (channel.config as any).accessToken;
         const pageId = (channel.config as any).metaBusinessId;
@@ -626,8 +668,10 @@ export class AutomationService {
             await firstValueFrom(this.http.post(url, payload, {
                 headers: { Authorization: `Bearer ${accessToken}` }
             }));
+            return true;
         } catch (e) {
             console.error('Failed to send button message:', e.response?.data || e.message);
+            return false;
         }
     }
 
