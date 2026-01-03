@@ -52,6 +52,7 @@ export interface FlowGraph {
 export interface ExecutionContext {
     workspaceId: string;
     contactId: string;
+    externalId?: string; // Platform specific ID (PSID, WAID)
     flowId: string;
     variables: Record<string, any>;
 }

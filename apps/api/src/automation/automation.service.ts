@@ -746,9 +746,29 @@ export class AutomationService {
                 recipient = { comment_id: context.variables.commentId };
             }
 
+            // const payload = {
+            //     recipient,
+            //     message: { text: messageText },
+            // };
+
             const payload = {
                 recipient,
-                message: { text: messageText },
+                message: {
+                    attachment: {
+                        type: "template",
+                        payload: {
+                            template_type: "button",
+                            text: messageText,
+                            buttons: [
+                                {
+                                    "type": "postback",
+                                    "PAYLOAD": "send_link_click",
+                                    "title": "Send Link"
+                                },
+                            ]
+                        }
+                    }
+                },
             };
 
             await firstValueFrom(this.http.post(url, payload, {
