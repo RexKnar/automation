@@ -185,8 +185,8 @@ export class MetaService {
                     headers: { Authorization: `Bearer ${accessToken}` }
                 })
             );
-
-            return mediaResponse.data || mediaResponse.data.data || [];
+            console.log(mediaResponse);
+            return mediaResponse.data.data || mediaResponse.data || [];
 
         } catch (error) {
             console.error('Error fetching Instagram media:', error?.response?.data || error.message);
