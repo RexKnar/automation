@@ -184,25 +184,20 @@ export class AutomationService {
             // Match Found! Trigger Flow
             console.log(`[Automation] Flow "${flow.name}" matched! Triggering...`);
 
-            // Check Gates (Follow / Email)
-            const canProceed = await this.checkGates(flow, data.fromId, { commentId: data.commentId });
-            if (!canProceed) {
-                console.log(`[Automation] Flow "${flow.name}" gated. Stopping execution.`);
-                continue;
-            }
+            await this.runFlow(flow.id, data.fromId, { commentId: data.commentId });
+        }
+    }
 
-            await this.prisma.automationLog.create({
-                data: {
-                    flowId: flow.id,
-                    workspaceId: flow.workspaceId,
-                    triggerType: 'COMMENT',
-                    status: 'TRIGGERED',
-                    message: `Triggered by comment from ${data.fromUsername}`,
-                    metadata: data,
-                },
-            });
+    // Wrapper to check gates before triggering
+    async runFlow(flowId: string, contactId: string, metadata?: any) {
+        const flow = await this.getFlow(flowId);
+        const canProceed = await this.checkGates(flow, contactId, { variables: metadata });
 
-            await this.triggerFlow(flow.id, data.fromId, { commentId: data.commentId });
+        if (canProceed) {
+            console.log(`[Automation] Gates passed for Flow ${flow.name}. Executing...`);
+            await this.triggerFlow(flowId, contactId, metadata);
+        } else {
+            console.log(`[Automation] Flow ${flow.name} gated/paused.`);
         }
     }
 
@@ -264,7 +259,7 @@ export class AutomationService {
                             data: { openingClicked: true }
                         });
                         // Resume
-                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        await this.runFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
                         return;
                     }
                 }
@@ -288,7 +283,7 @@ export class AutomationService {
                             data: { emailProvided: true }
                         });
                         // Resume
-                        await this.triggerFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
+                        await this.runFlow(flow.id, data.fromId, (contact.customData as any).pendingMetadata);
                         return;
                     } else {
                         // Invalid Email - Ask again (optional, or just ignore)
@@ -331,7 +326,7 @@ export class AutomationService {
                     },
                 });
 
-                await this.triggerFlow(flow.id, data.fromId);
+                await this.runFlow(flow.id, data.fromId);
                 // Only trigger one flow per keyword match? For now, yes.
                 break;
             }
@@ -448,7 +443,7 @@ export class AutomationService {
         });
 
         // 3. Resume Flow (Trigger it again, checkGates will now pass)
-        await this.triggerFlow(flowId, contactId, metadata);
+        await this.runFlow(flowId, contactId, metadata);
     }
 
     async checkGates(flow: any, contactId: string, context: any): Promise<boolean> {
