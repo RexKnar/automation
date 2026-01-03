@@ -483,7 +483,7 @@ export class AutomationService {
         }
     }
 
-    async handleFollowConfirmation(contactId: string) {
+    async handleFollowConfirmation(contactId: string, flowId?: string) {
         console.log(`[Automation] Follow confirmed for ${contactId}`);
         // 1. Find pending flow for this contact
         // We need to store the pending flow ID in the contact's customData or metadata
@@ -500,7 +500,16 @@ export class AutomationService {
             }
         });
 
-        if (!contact || !contact.customData || !(contact.customData as any).pendingFlowId) {
+        if (!contact) {
+            console.log('[Automation] Contact not found for follow confirmation.');
+            return;
+        }
+
+        // Priority: Payload Flow ID > Pending Flow ID
+        const targetFlowId = flowId || (contact.customData as any)?.pendingFlowId;
+        const metadata = (contact.customData as any)?.pendingMetadata || {};
+
+        if (!targetFlowId) {
             console.log('[Automation] No pending flow found for follow confirmation.');
             return;
         }
@@ -522,8 +531,18 @@ export class AutomationService {
             }
         });
 
-        // 3. Resume Flow (Trigger it again, checkGates will now pass)
-        await this.runFlow(flowId, contactId, metadata);
+        // Update Log
+        const log = await this.getOrCreateDeliveryLog(targetFlowId, contact.id, (contact.customData as any)?.pendingMetadata?.workspaceId);
+        if (log) {
+            await this.prisma.automationDeliveryLog.update({
+                where: { id: log.id },
+                data: { followConfirmed: true }
+            });
+        }
+
+        // 3. Resume Flow
+        console.log(`[Automation] Resuming Flow ${targetFlowId} for Contact ${contact.id}`);
+        await this.runFlow(targetFlowId, contactId, metadata);
     }
 
     async checkGates(flow: any, contact: any, context: any, isNewExecution: boolean = false): Promise<boolean> {

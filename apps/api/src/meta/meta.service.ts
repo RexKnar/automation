@@ -390,6 +390,7 @@ export class MetaService {
                     }
                     // Handle Postbacks (Buttons)
                     if (messaging.postback) {
+                        console.log('[MetaService] Postback received:', JSON.stringify(messaging.postback));
                         await this.handlePostback(messaging);
                     }
                 }
@@ -493,9 +494,20 @@ export class MetaService {
         const payload = messaging.postback.payload;
         const fromId = messaging.sender.id;
 
-        if (payload === 'FOLLOW_CONFIRMED') {
+        if (payload === 'FOLLOW_CONFIRMED' || payload.startsWith('FOLLOW_CONFIRMED:')) {
             // User clicked "Done"
+            console.log('[MetaService] Handling FOLLOW_CONFIRMED postback');
             await this.automationService.handleFollowConfirmation(fromId);
+        } else {
+            console.log(`[MetaService] Forwarding postback payload: ${payload}`);
+            // Forward other postbacks (like SEND_LINK) to automation service
+            await this.automationService.handleIncomingMessage({
+                text: messaging.postback.title,
+                messageId: 'POSTBACK_' + Date.now(),
+                fromId: fromId,
+                isPostback: true,
+                payload: payload
+            });
         }
     }
 
