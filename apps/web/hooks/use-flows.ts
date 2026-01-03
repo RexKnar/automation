@@ -79,3 +79,14 @@ export const useUpdateFlow = () => {
         },
     });
 };
+
+export const useFlowStats = (id: string) => {
+    return useQuery({
+        queryKey: ["flow-stats", id],
+        queryFn: async () => {
+            const { data } = await axios.get<any>(`/automation/flows/${id}/stats`);
+            return data;
+        },
+        enabled: !!id,
+    });
+};

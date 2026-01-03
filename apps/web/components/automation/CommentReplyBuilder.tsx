@@ -600,6 +600,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                         </div>
                     </TabsContent>
 
+                    <TabsContent value="dm" className="flex-1 m-0 bg-black flex flex-col">
                         {/* DM Header */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
                             <div className="flex items-center gap-3">
@@ -740,6 +741,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                                 </div>
                             </div>
                         </div>
+                    </TabsContent>
                 </Tabs>
             </div>
             

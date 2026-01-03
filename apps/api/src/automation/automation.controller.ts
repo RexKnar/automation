@@ -60,4 +60,9 @@ export class AutomationController {
     getLogs(@Param('flowId') flowId: string) {
         return this.automationService.getLogs(flowId);
     }
+
+    @Get('flows/:id/stats')
+    getFlowStats(@Param('id') id: string) {
+        return this.automationService.getFlowStats(id);
+    }
 }
