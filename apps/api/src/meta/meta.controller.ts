@@ -161,4 +161,24 @@ export class MetaController {
         // await this.metaService.connectManually(userId, body.accessToken);
         return { success: true, message: 'Connected manually' };
     }
+
+    @Post('deauthorize')
+    @Public()
+    @HttpCode(HttpStatus.OK)
+    async deauthorize(@Body('signed_request') signedRequest: string) {
+        if (!signedRequest) {
+            throw new BadRequestException('signed_request is required');
+        }
+        return this.metaService.handleDeauthorization(signedRequest);
+    }
+
+    @Post('data-deletion')
+    @Public()
+    @HttpCode(HttpStatus.OK)
+    async dataDeletion(@Body('signed_request') signedRequest: string) {
+        if (!signedRequest) {
+            throw new BadRequestException('signed_request is required');
+        }
+        return this.metaService.handleDataDeletion(signedRequest);
+    }
 }
