@@ -186,7 +186,7 @@ export class MetaService {
                 })
             );
 
-            return mediaResponse.data.data || [];
+            return mediaResponse.data || mediaResponse.data.data || [];
 
         } catch (error) {
             console.error('Error fetching Instagram media:', error?.response?.data || error.message);
