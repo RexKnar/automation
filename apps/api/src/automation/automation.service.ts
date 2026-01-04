@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { MetaService } from '../meta/meta.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
@@ -11,6 +12,8 @@ export class AutomationService {
         private prisma: PrismaService,
         private http: HttpService,
         private config: ConfigService,
+        @Inject(forwardRef(() => MetaService))
+        private metaService: MetaService,
     ) { }
 
     async createFlow(userId: string, data: {
@@ -576,8 +579,35 @@ export class AutomationService {
 
         // 1. Follow Check
         if (requireFollow) {
-            const isFollower = (contact.customData as any)?.isFollower || log.followConfirmed;
+            let isFollower = (contact.customData as any)?.isFollower || log.followConfirmed;
             console.log(`[Automation] Follow Check: Contact ${contact.id}, isFollower=${isFollower}, log.followConfirmed=${log.followConfirmed}`);
+
+            if (!isFollower) {
+                // Try to verify via API
+                const channel = await this.prisma.channel.findFirst({
+                    where: { workspaceId: flow.workspaceId, type: 'INSTAGRAM', isActive: true }
+                });
+
+                if (channel && channel.config && (channel.config as any).accessToken) {
+                    const pageId = (channel.config as any).metaBusinessId;
+                    const accessToken = (channel.config as any).accessToken;
+
+                    const apiIsFollower = await this.metaService.checkInstagramFollow(externalId, pageId, accessToken);
+
+                    if (apiIsFollower) {
+                        console.log(`[Automation] API confirmed user ${externalId} is following.`);
+                        isFollower = true;
+
+                        // Update Contact
+                        await this.prisma.contact.update({
+                            where: { id: contact.id },
+                            data: {
+                                customData: { ...(contact.customData as any), isFollower: true }
+                            }
+                        });
+                    }
+                }
+            }
 
             if (!isFollower) {
                 if (!log.followMsgSent) {
