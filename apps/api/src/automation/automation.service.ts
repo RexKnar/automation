@@ -601,7 +601,9 @@ export class AutomationService {
                     const pageId = (channel.config as any).metaBusinessId;
                     const accessToken = (channel.config as any).accessToken;
 
+                    console.log(`[Automation] Checking follow status for ${externalId} on page ${pageId}`);
                     const apiIsFollower = await this.metaService.checkInstagramFollow(externalId, pageId, accessToken);
+                    console.log(`[Automation] API confirmed user ${externalId} is following: ${apiIsFollower}`);
 
                     if (apiIsFollower) {
                         console.log(`[Automation] API confirmed user ${externalId} is following.`);
