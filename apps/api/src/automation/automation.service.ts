@@ -976,6 +976,26 @@ export class AutomationService {
                 data: { linkMsgSent: true } // Assuming this is the final message
             });
 
+            // If this was the Link Message (Final Step), Clear Pending State
+            if (isLinkDM) {
+                console.log(`[Automation] Flow ${context.flowId} Completed for Contact ${context.contactId}. Clearing state.`);
+                const currentContact = await this.prisma.contact.findUnique({ where: { id: context.contactId } });
+
+                if (currentContact) {
+                    await this.prisma.contact.update({
+                        where: { id: context.contactId },
+                        data: {
+                            customData: {
+                                ...(currentContact.customData as any),
+                                pendingFlowId: null,
+                                pendingMetadata: null,
+                                automationState: 'COMPLETED'
+                            }
+                        }
+                    });
+                }
+            }
+
             await this.prisma.automationLog.create({
                 data: {
                     flowId: context.flowId,
