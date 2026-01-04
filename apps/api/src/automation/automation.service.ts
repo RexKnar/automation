@@ -459,17 +459,26 @@ export class AutomationService {
         console.log(`Executing Node: ${node.type} (${node.id}) for Contact: ${context.contactId}`);
 
         // 1. Process Node Logic
-        switch (node.type) {
-            case 'MESSAGE':
-                await this.sendMessage(node, context);
-                break;
-            case 'CONDITION':
-                // Evaluate condition and return specific next node
-                // For now, just continue
-                break;
-            case 'DELAY':
-                // Schedule job and stop execution
-                return;
+        const isGateNode = node.id.includes('request_follow_dm') ||
+            node.data.messageType === 'request_follow_dm' ||
+            node.id.includes('opening_dm') ||
+            node.data.messageType === 'opening_dm';
+
+        if (isGateNode) {
+            console.log(`[Automation] Skipping Gate Node Execution (Handled by checkGates): ${node.id}`);
+        } else {
+            switch (node.type) {
+                case 'MESSAGE':
+                    await this.sendMessage(node, context);
+                    break;
+                case 'CONDITION':
+                    // Evaluate condition and return specific next node
+                    // For now, just continue
+                    break;
+                case 'DELAY':
+                    // Schedule job and stop execution
+                    return;
+            }
         }
 
         // 2. Find Next Node
