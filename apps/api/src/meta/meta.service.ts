@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, InternalServerErrorException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -11,6 +11,7 @@ export class MetaService {
         private config: ConfigService,
         private http: HttpService,
         private prisma: PrismaService,
+        @Inject(forwardRef(() => AutomationService))
         private automationService: AutomationService,
     ) { }
 
