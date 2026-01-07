@@ -337,6 +337,12 @@ export class AutomationService {
 
                 if (action === 'send_link' || action === 'send_link_click' || text === 'send_link') {
                     console.log(`[Automation] Opening Button Clicked for Flow ${flowId}`);
+
+                    if (log.openingClicked) {
+                        console.log(`[Automation] Link already sent for Flow ${flowId}. Ignoring duplicate click.`);
+                        return;
+                    }
+
                     await this.prisma.automationDeliveryLog.update({
                         where: { id: log.id },
                         data: { openingClicked: true }
@@ -553,7 +559,7 @@ export class AutomationService {
         }
 
         // 3. Resume Flow
-        console.log(`[Automation] Resuming Flow ${targetFlowId} for Contact ${contact.id}`);
+        console.log(`[Automation] Resuming Flow ${targetFlowId} for Contact ${contact.id} with metadata:`, JSON.stringify(metadata));
         await this.runFlow(targetFlowId, contactId, metadata);
     }
 
