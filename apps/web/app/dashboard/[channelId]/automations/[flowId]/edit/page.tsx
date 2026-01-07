@@ -149,12 +149,43 @@ export default function EditAutomationPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this automation? This action cannot be undone.")) return;
+
+    try {
+      setIsSaving(true);
+      await axiosInstance.delete(`/automation/flows/${params.flowId}`);
+      router.push(`/dashboard/${params.channelId}`);
+    } catch (error) {
+      console.error("Failed to delete automation:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    try {
+      setIsSaving(true);
+      const newStatus = !flow.isActive;
+      await axiosInstance.patch(`/automation/flows/${params.flowId}`, { isActive: newStatus });
+      // Invalidate query to refresh data
+      // For now, we can just reload or let react-query handle it if we had access to queryClient
+      window.location.reload(); 
+    } catch (error) {
+      console.error("Failed to update status:", error);
+      setIsSaving(false);
+    }
+  };
+
   return (
     <CommentReplyBuilder 
       initialData={initialData}
       onSave={handleSave} 
       isSaving={isSaving} 
-      channelId={params.channelId as string} 
+      channelId={params.channelId as string}
+      isActive={flow?.isActive}
+      onDelete={handleDelete}
+      onToggleStatus={handleToggleStatus}
     />
   );
 }
