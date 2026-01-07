@@ -11,6 +11,12 @@ import { AutomationModule } from './automation/automation.module';
 import { ConfigModule } from '@nestjs/config';
 
 import { UsersModule } from './users/users.module';
+import { PaymentModule } from './payment/payment.module';
+import { RolesModule } from './roles/roles.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { SeedModule } from './seed/seed.module';
+import { AdminModule } from './admin/admin.module';
+import { ReferralModule } from './referral/referral.module';
 
 @Module({
   imports: [
@@ -23,6 +29,13 @@ import { UsersModule } from './users/users.module';
     WhatsappModule,
     AutomationModule,
     UsersModule,
+    PaymentModule,
+    RolesModule,
+    RolesModule,
+    InvitationsModule,
+    SeedModule,
+    AdminModule,
+    ReferralModule,
   ],
   controllers: [AppController],
   providers: [

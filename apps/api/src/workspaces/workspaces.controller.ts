@@ -8,6 +8,7 @@ import {
     HttpCode,
     HttpStatus,
     Param,
+    Delete,
 } from '@nestjs/common';
 import { WorkspacesService } from './workspaces.service';
 import { CreateWorkspaceDto, UpdateWorkspaceDto } from './dto';
@@ -47,5 +48,31 @@ export class WorkspacesController {
         @Body() dto: UpdateWorkspaceDto,
     ) {
         return this.workspacesService.updateWorkspace(id, dto);
+    }
+    @Patch(':id/plan')
+    @HttpCode(HttpStatus.OK)
+    async updatePlan(
+        @Param('id') id: string,
+        @Body() body: { plan: 'FREE' | 'PRO' | 'ENTERPRISE' },
+    ) {
+        return this.workspacesService.updatePlan(id, body.plan);
+    }
+    @Patch(':id/members/:memberId')
+    @HttpCode(HttpStatus.OK)
+    async updateMemberRole(
+        @Param('id') workspaceId: string,
+        @Param('memberId') memberId: string,
+        @Body() body: { roleId: string },
+    ) {
+        return this.workspacesService.updateMemberRole(workspaceId, memberId, body.roleId);
+    }
+
+    @Delete(':id/members/:memberId')
+    @HttpCode(HttpStatus.OK)
+    async removeMember(
+        @Param('id') workspaceId: string,
+        @Param('memberId') memberId: string,
+    ) {
+        return this.workspacesService.removeMember(workspaceId, memberId);
     }
 }

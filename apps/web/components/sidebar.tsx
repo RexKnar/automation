@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useLogout } from "@/hooks/useAuth";
 import { 
   LayoutDashboard, 
   Workflow, 
@@ -42,10 +43,17 @@ const routes = [
     icon: Settings,
     href: "/dashboard/settings",
   },
+  {
+    label: "Referrals",
+    icon: Users,
+    href: "/dashboard/referrals",
+    color: "text-green-500",
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const logout = useLogout();
 
   return (
     <div className="space-y-4 py-4 flex flex-col h-full bg-[#111827] text-white">
@@ -78,7 +86,10 @@ export function Sidebar() {
         </div>
       </div>
       <div className="px-3 py-2">
-         <div className="text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition text-zinc-400">
+         <div 
+           onClick={() => logout.mutate()}
+           className="text-sm group flex p-3 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-white/10 rounded-lg transition text-zinc-400"
+         >
              <LogOut className="h-5 w-5 mr-3 text-red-500" />
              Logout
          </div>

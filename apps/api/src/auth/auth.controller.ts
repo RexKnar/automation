@@ -57,6 +57,19 @@ export class AuthController {
         return { access_token: tokens.access_token };
     }
 
+    @Post('verify-email')
+    @HttpCode(HttpStatus.OK)
+    async verifyEmail(@Body('token') token: string) {
+        return this.authService.verifyEmail(token);
+    }
+
+    @UseGuards(AtGuard)
+    @Post('resend-verification')
+    @HttpCode(HttpStatus.OK)
+    async resendVerification(@GetCurrentUser('sub') userId: string) {
+        return this.authService.resendVerificationEmail(userId);
+    }
+
     private setRefreshTokenCookie(res: Response, token: string) {
         res.cookie('Refresh', token, {
             httpOnly: true,

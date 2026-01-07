@@ -1,0 +1,9 @@
+-- AlterTable
+ALTER TABLE "ReferralCode" ADD COLUMN     "eligiblePlans" TEXT[],
+ADD COLUMN     "expiryDate" TIMESTAMP(3),
+ADD COLUMN     "maxUsage" INTEGER,
+ADD COLUMN     "renewalRewardAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "renewalRewardType" TEXT NOT NULL DEFAULT 'NONE',
+ADD COLUMN     "rewardAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "rewardTrigger" TEXT NOT NULL DEFAULT 'FIRST_PURCHASE',
+ADD COLUMN     "rewardType" TEXT NOT NULL DEFAULT 'FLAT';

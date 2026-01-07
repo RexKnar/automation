@@ -6,6 +6,7 @@ export interface Workspace {
     name: string;
     slug: string;
     role: string;
+    plan: 'FREE' | 'PRO' | 'ENTERPRISE';
     channels?: any[];
 }
 

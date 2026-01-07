@@ -19,6 +19,11 @@ model User {
   name         String?
   avatarUrl    String?
   role         GlobalRole @default(USER) // USER, SUPER_ADMIN
+  
+  emailVerified     DateTime?
+  verificationToken String?
+  referralCode      String?    @unique
+
   createdAt    DateTime   @default(now())
 
   memberships WorkspaceMember[]
@@ -37,6 +42,8 @@ model Workspace {
   razorpayCustomerId     String?
 
   members      WorkspaceMember[]
+  roles        Role[]
+  invitations  Invitation[]
   channels     Channel[]
   flows        Flow[]
   contacts     Contact[]
@@ -44,6 +51,12 @@ model Workspace {
   customFields CustomField[]
   logs         AutomationLog[]
   deliveryLogs AutomationDeliveryLog[]
+  payments     Payment[]
+
+  planId      String?
+  currentPlan Plan?   @relation(fields: [planId], references: [id])
+  isActive    Boolean @default(true)
+  referralCode String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -53,13 +66,51 @@ model WorkspaceMember {
   id          String        @id @default(uuid())
   userId      String
   workspaceId String
-  role        WorkspaceRole // OWNER, ADMIN, EDITOR, AGENT
+  role        WorkspaceRole @default(AGENT) // Kept for backward compatibility, mapped to System Roles
+  roleId      String?       // Optional during migration
+
+  assignedChannels Channel[] // Many-to-many relation for channel access control
 
   user      User      @relation(fields: [userId], references: [id])
   workspace Workspace @relation(fields: [workspaceId], references: [id])
+  userRole  Role?     @relation(fields: [roleId], references: [id])
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  permissions Json     @default("{}")
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id])
+  members   WorkspaceMember[]
+  invitations Invitation[]
+
+  @@unique([workspaceId, name])
+}
+
+model Invitation {
+  id                 String   @id @default(uuid())
+  email              String
+  roleId             String
+  workspaceId        String
+  token              String   @unique
+  status             String   @default("PENDING") // PENDING, ACCEPTED, EXPIRED
+  assignedChannelIds String[] // IDs of channels assigned to this invite
+  expiresAt          DateTime
+  createdAt          DateTime @default(now())
+
+  role      Role      @relation(fields: [roleId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([token])
+  @@index([email])
 }
 
 // --- Integration Layer (Omnichannel) ---
@@ -79,6 +130,8 @@ model Channel {
   workspace       Workspace        @relation(fields: [workspaceId], references: [id])
   conversations   Conversation[]
   contactChannels ContactChannel[]
+  assignedMembers WorkspaceMember[] // Many-to-many relation for channel access control
+  flows           Flow[] // One-to-many relation: Channel has many Flows
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -91,6 +144,7 @@ model Channel {
 model Flow {
   id          String      @id @default(uuid())
   workspaceId String
+  channelId   String?     // Optional link to specific channel
   name        String
   channelType ChannelType // Limit flow to specific channel type
   triggerType TriggerType // KEYWORD, COMMENT, STORY_REPLY, WELCOME
@@ -108,6 +162,7 @@ model Flow {
   deliveryLogs AutomationDeliveryLog[]
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
+  channel   Channel?  @relation(fields: [channelId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -361,4 +416,92 @@ model AutomationDeliveryLog {
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   @@index([flowId, contactId])
+}
+
+// --- Super Admin Module ---
+
+model AdminUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         AdminRole @default(SUPER_ADMIN)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Plan {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  prices    Json     @default("{}") // { "USD": 10, "INR": 800 }
+  limits    Json     @default("{}")
+  features  Json     @default("{}")
+  isCustom  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces Workspace[]
+}
+
+model Payment {
+  id          String   @id @default(uuid())
+  workspaceId String
+  amount      Decimal
+  status      String // PENDING, COMPLETED, FAILED
+  providerId  String? // Razorpay Order ID
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+}
+
+model Referral {
+  id           String   @id @default(uuid())
+  referrerId   String   // User ID or Workspace ID
+  refereeId    String   // User ID or Workspace ID
+  code         String
+  status       String   @default("PENDING") // PENDING, COMPLETED
+  rewardStatus String   @default("PENDING") // PENDING, PAID
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([referrerId])
+  @@index([refereeId])
+  @@index([code])
+}
+
+model ReferralCode {
+  id           String   @id @default(uuid())
+  code         String   @unique
+  referrerId   String   // User ID or Workspace ID
+  type         String   @default("ALIAS") // ALIAS, CAMPAIGN
+  isActive     Boolean  @default(true)
+  usageCount   Int      @default(0)
+  
+  // Advanced Configuration
+  rewardType          String   @default("FLAT") // FLAT, PERCENTAGE
+  rewardAmount        Float    @default(0)
+  eligiblePlans       String[] // Array of Plan IDs
+  rewardTrigger       String   @default("FIRST_PURCHASE") // FIRST_PURCHASE, RECURRING
+  renewalRewardType   String   @default("NONE") // FLAT, PERCENTAGE, NONE
+  renewalRewardAmount Float    @default(0)
+  maxUsage            Int?
+  expiryDate          DateTime?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([referrerId])
+  @@index([code])
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  PRODUCT_OWNER
+  SUPPORT
+  SALES
+  RELATIONSHIP_MANAGER
 }
