@@ -27,7 +27,7 @@ export default function AdminReferralCodesPage() {
     isActive: "true",
     rewardType: "FLAT",
     rewardAmount: "0",
-    eligiblePlans: [],
+    eligiblePlans: [] as string[],
     rewardTrigger: "FIRST_PURCHASE",
     renewalRewardType: "NONE",
     renewalRewardAmount: "0",
@@ -75,7 +75,7 @@ export default function AdminReferralCodesPage() {
         renewalRewardType: code.renewalRewardType || "NONE",
         renewalRewardAmount: code.renewalRewardAmount?.toString() || "0",
         maxUsage: code.maxUsage?.toString() || "",
-        expiryDate: code.expiryDate ? new Date(code.expiryDate).toISOString().split('T')[0] : ""
+        expiryDate: code.expiryDate ? (new Date(code.expiryDate).toISOString().split('T')[0] ?? "") : ""
       });
     } else {
       setEditingCode(null);
