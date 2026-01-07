@@ -1076,7 +1076,7 @@ export class AutomationService {
         }
 
         const accessToken = (channel.config as any).accessToken;
-        const url = `https://graph.facebook.com/v21.0/${commentId}/replies`;
+        const url = `https://graph.instagram.com/v21.0/${commentId}/replies`;
 
         try {
             await firstValueFrom(this.http.post(url, {
