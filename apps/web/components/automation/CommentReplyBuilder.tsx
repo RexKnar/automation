@@ -28,7 +28,11 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
   const [keywords, setKeywords] = useState<string[]>(initialData?.keywords || []);
   const [keywordInput, setKeywordInput] = useState(initialData?.keywords?.join(", ") || "");
   const [replyToComments, setReplyToComments] = useState(initialData?.replyToComments ?? false);
-  const [replies, setReplies] = useState<string[]>(initialData?.replies || ["Thanks! Please see DMs.", "Sent you a message! Check it out!", "Nice! Check your DMs!"]);
+  const [replies, setReplies] = useState<string[]>(
+    (initialData?.replies && initialData.replies.length === 3) 
+      ? initialData.replies 
+      : ["Thanks! Please see DMs.", "Sent you a message! Check it out!", "Nice! Check your DMs!"]
+  );
   const [selectedMediaId, setSelectedMediaId] = useState<string | null>(initialData?.selectedMediaId || null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("post");
@@ -89,8 +93,11 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
       newErrors.push("Please enter at least one keyword.");
     }
 
-    if (replyToComments && replies.every(r => !r.trim())) {
-      newErrors.push("Please enter at least one reply text.");
+    if (replyToComments) {
+        const filledReplies = replies.filter(r => r && r.trim().length > 0);
+        if (filledReplies.length < 3) {
+            newErrors.push("Please provide all 3 reply variations to avoid spam.");
+        }
     }
 
     if (openingDM && !openingDMText.trim()) {
@@ -319,10 +326,14 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                 
                 {replyToComments && (
                     <div className="pl-0 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                        {replies.map((reply, index) => (
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-xs text-blue-800 flex gap-2">
+                            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                            <span>Please provide 3 different variations. We'll rotate between them to avoid spam detection.</span>
+                        </div>
+                        {[0, 1, 2].map((index) => (
                             <Input 
                                 key={index}
-                                value={reply}
+                                value={replies[index] || ""}
                                 onChange={(e) => handleReplyChange(index, e.target.value)}
                                 placeholder={`Reply option ${index + 1}`}
                                 className="text-sm text-foreground"
