@@ -471,6 +471,9 @@ export class AutomationService {
                 case 'MESSAGE':
                     await this.sendMessage(node, context);
                     break;
+                case 'ACTION':
+                    await this.executeActionNode(node, context);
+                    break;
                 case 'CONDITION':
                     // Evaluate condition and return specific next node
                     // For now, just continue
@@ -1029,6 +1032,54 @@ export class AutomationService {
                     metadata: { error: error?.response?.data || error.message },
                 },
             });
+        }
+    }
+
+    async executeActionNode(node: FlowNode, context: ExecutionContext) {
+        console.log(`[Automation] Executing Action Node: ${node.id}`);
+
+        if (node.id === 'comment_reply') {
+            const replies = node.data.replies || [];
+            if (replies.length === 0) return;
+
+            // Pick random reply
+            const replyText = replies[Math.floor(Math.random() * replies.length)];
+
+            // We need the comment ID to reply to.
+            // It should be in context.variables.commentId from the trigger.
+            const commentId = context.variables?.commentId;
+
+            if (commentId) {
+                await this.replyToComment(context.workspaceId, commentId, replyText);
+            } else {
+                console.warn(`[Automation] No commentId found in context for comment_reply action.`);
+            }
+        }
+    }
+
+    async replyToComment(workspaceId: string, commentId: string, text: string) {
+        console.log(`[Automation] Replying to comment ${commentId}: "${text}"`);
+
+        const channel = await this.prisma.channel.findFirst({
+            where: { workspaceId, type: 'INSTAGRAM', isActive: true },
+        });
+
+        if (!channel || !channel.config || !(channel.config as any).accessToken) {
+            console.error(`[Automation] No active Instagram channel found for workspace ${workspaceId}`);
+            return;
+        }
+
+        const accessToken = (channel.config as any).accessToken;
+        const url = `https://graph.facebook.com/v21.0/${commentId}/replies`;
+
+        try {
+            await firstValueFrom(this.http.post(url, {
+                message: text,
+                access_token: accessToken
+            }));
+            console.log(`[Automation] Successfully replied to comment ${commentId}`);
+        } catch (e) {
+            console.error(`[Automation] Failed to reply to comment:`, e.response?.data || e.message);
         }
     }
 }

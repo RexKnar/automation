@@ -80,23 +80,11 @@ export default function EditAutomationPage() {
         }
       ];
 
-      if (data.replyToComments) {
-        nodes.push({
-          id: 'comment_reply',
-          type: 'ACTION',
-          position: { x: 0, y: 100 },
-          data: {
-            label: 'Reply to Comment',
-            replies: data.replies
-          } as any
-        });
-      }
-
       if (data.openingDM) {
         nodes.push({
           id: 'opening_dm',
           type: 'MESSAGE',
-          position: { x: 0, y: 200 },
+          position: { x: 0, y: 100 },
           data: {
             label: 'Opening DM',
             content: data.openingDMText,
@@ -109,7 +97,7 @@ export default function EditAutomationPage() {
         nodes.push({
           id: 'link_dm',
           type: 'MESSAGE',
-          position: { x: 0, y: 300 },
+          position: { x: 0, y: 200 },
           data: {
             label: 'Link DM',
             content: `${data.dmLinkText}\n${data.linkUrl}`
@@ -117,12 +105,20 @@ export default function EditAutomationPage() {
         });
       }
 
+      if (data.replyToComments) {
+        nodes.push({
+          id: 'comment_reply',
+          type: 'ACTION',
+          position: { x: 0, y: 300 },
+          data: {
+            label: 'Reply to Comment',
+            replies: data.replies
+          } as any
+        });
+      }
+
       const edges = [];
       let previousNodeId = 'trigger';
-
-      if (data.replyToComments) {
-        edges.push({ id: `e-${previousNodeId}-comment_reply`, source: previousNodeId, target: 'comment_reply' });
-      }
 
       if (data.openingDM) {
         edges.push({ id: `e-${previousNodeId}-opening_dm`, source: previousNodeId, target: 'opening_dm' });
@@ -131,6 +127,11 @@ export default function EditAutomationPage() {
 
       if (data.dmLinkText || data.linkUrl) {
         edges.push({ id: `e-${previousNodeId}-link_dm`, source: previousNodeId, target: 'link_dm' });
+        previousNodeId = 'link_dm';
+      }
+
+      if (data.replyToComments) {
+        edges.push({ id: `e-${previousNodeId}-comment_reply`, source: previousNodeId, target: 'comment_reply' });
       }
 
       const payload = {

@@ -7,14 +7,23 @@ import { UpdateUserDto } from './dto/update-user.dto';
 export class UsersService {
   constructor(private prisma: PrismaService) { }
 
-  findAll() {
-    return this.prisma.user.findMany();
+  async findAll() {
+    const users = await this.prisma.user.findMany();
+    return users.map(user => {
+      const { passwordHash, ...result } = user;
+      return result;
+    });
   }
 
-  findOne(id: string) {
-    return this.prisma.user.findUnique({
+  async findOne(id: string) {
+    const user = await this.prisma.user.findUnique({
       where: { id },
     });
+    if (user) {
+      const { passwordHash, ...result } = user;
+      return result;
+    }
+    return null;
   }
 
   update(id: string, updateUserDto: UpdateUserDto) {
