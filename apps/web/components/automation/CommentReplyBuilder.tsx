@@ -453,8 +453,8 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
             
             {initialData && onToggleStatus && (
                 <Button 
-                    variant="outline"
-                    className={`flex-1 h-12 ${isActive ? 'text-amber-600 border-amber-200 hover:bg-amber-50' : 'text-green-600 border-green-200 hover:bg-green-50'}`}
+                    variant={isActive ? "outline" : "default"}
+                    className={`flex-1 h-12 ${isActive ? 'text-amber-600 border-amber-200 hover:bg-amber-50' : 'bg-green-600 hover:bg-green-700 text-white'}`}
                     onClick={onToggleStatus}
                     disabled={isSaving}
                 >

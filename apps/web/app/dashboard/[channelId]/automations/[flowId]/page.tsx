@@ -101,8 +101,10 @@ export default function AutomationDetailsPage() {
     }
   });
 
-  const handleStop = () => {
-    updateFlowMutation.mutate({ isActive: false });
+  const handleToggleStatus = () => {
+    const action = flow?.isActive ? "stop" : "publish";
+    if (!confirm(`Are you sure you want to ${action} this automation?`)) return;
+    updateFlowMutation.mutate({ isActive: !flow?.isActive });
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -124,7 +126,14 @@ export default function AutomationDetailsPage() {
             <Link href={`/dashboard/${channelId}/automations/${flowId}/edit`}>
                 <Button variant="outline" size="sm">Edit</Button>
             </Link>
-            <Button variant="destructive" size="sm" onClick={handleStop}>Stop</Button>
+            <Button 
+                variant={flow?.isActive ? "destructive" : "default"} 
+                size="sm" 
+                onClick={handleToggleStatus}
+                className={!flow?.isActive ? "bg-green-600 hover:bg-green-700" : ""}
+            >
+                {flow?.isActive ? "Stop" : "Publish"}
+            </Button>
           </div>
         </div>
 

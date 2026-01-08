@@ -164,6 +164,9 @@ export default function EditAutomationPage() {
   };
 
   const handleToggleStatus = async () => {
+    const action = flow?.isActive ? "stop" : "publish";
+    if (!confirm(`Are you sure you want to ${action} this automation?`)) return;
+
     try {
       setIsSaving(true);
       const newStatus = !flow.isActive;
