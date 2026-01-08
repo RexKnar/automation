@@ -1,28 +1,28 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, CheckCircle } from "lucide-react";
 import axios from "@/lib/axios";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function ConnectInstagramPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const handleConnect = async () => {
-    try {
-      setIsLoading(true);
-      const { data } = await axios.get<{ authUrl: string }>("/meta/auth");
-      window.location.href = data.authUrl;
-    } catch (error) {
-      console.error("Failed to get auth url", error);
-      toast.error("Failed to initiate connection");
-      setIsLoading(false);
+  useEffect(() => {
+    const status = searchParams.get("status");
+    if (status === "success") {
+      setShowSuccessModal(true);
+    } else if (status === "error") {
+      toast.error("Failed to connect Instagram account");
     }
-  };
+  }, [searchParams]);
 
   const handleInstagramConnect = async () => {
     try {
@@ -36,8 +36,33 @@ export default function ConnectInstagramPage() {
     }
   };
 
+  const handleSuccessClose = () => {
+    setShowSuccessModal(false);
+    router.push("/dashboard");
+  };
+
   return (
     <div className="flex h-full bg-white dark:bg-gray-950">
+      {/* Success Modal */}
+      <Dialog open={showSuccessModal} onOpenChange={handleSuccessClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 mb-4">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+            </div>
+            <DialogTitle className="text-center">Connection Successful!</DialogTitle>
+            <DialogDescription className="text-center">
+              Your Instagram account has been successfully connected to ReXocial.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-center">
+            <Button onClick={handleSuccessClose} className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
+              Go to Dashboard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Left Side - Illustration */}
       <div className="w-1/2 p-12 flex flex-col justify-center border-r dark:border-gray-800">
         <div className="max-w-md mx-auto">
@@ -75,17 +100,6 @@ export default function ConnectInstagramPage() {
           </p>
 
           <Button 
-            className="w-full bg-[#1877F2] hover:bg-[#166fe5] text-white h-12 text-lg mb-4"
-            onClick={handleConnect}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-            ) : null}
-            Connect via Facebook
-          </Button>
-
-          <Button 
             className="w-full bg-gradient-to-r from-[#833ab4] via-[#fd1d1d] to-[#fcb045] hover:opacity-90 text-white h-12 text-lg mb-6"
             onClick={handleInstagramConnect}
             disabled={isLoading}
@@ -107,10 +121,6 @@ export default function ConnectInstagramPage() {
               Meta<br /><span className="text-xs font-normal text-muted-foreground">Business Partner</span>
             </div>
           </div>
-
-          <button className="mt-6 text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center">
-            See More Options <ChevronDown className="w-4 h-4 ml-1" />
-          </button>
         </div>
       </div>
     </div>
