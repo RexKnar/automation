@@ -10,8 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-export default function FlowBuilderPage({ params }: { params: { id: string } }) {
-    const { data: flow, isLoading } = useFlow(params.id);
+import { useParams } from "next/navigation";
+
+export default function FlowBuilderPage() {
+    const params = useParams();
+    const id = params.id as string;
+    const { data: flow, isLoading } = useFlow(id);
     const updateFlow = useUpdateFlow();
     const editorRef = useRef<FlowEditorRef>(null);
 
@@ -22,7 +26,7 @@ export default function FlowBuilderPage({ params }: { params: { id: string } }) 
         
         try {
             await updateFlow.mutateAsync({
-                id: params.id,
+                id: id,
                 data: {
                     nodes,
                     edges,
@@ -54,27 +58,87 @@ export default function FlowBuilderPage({ params }: { params: { id: string } }) 
         <div className="h-[calc(100vh-64px)] flex flex-col">
             <div className="h-16 border-b bg-white dark:bg-gray-900 flex items-center px-6 justify-between">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-lg font-semibold">{flow.name}</h1>
-                    <span className="text-sm text-muted-foreground hidden md:inline-block">ID: {params.id}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${flow.isActive
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                    <div className="flex items-center text-sm text-muted-foreground">
+                        <span>Automations</span>
+                        <span className="mx-2">›</span>
+                        <span className="font-medium text-foreground">{flow.name}</span>
+                        <span className="ml-2 cursor-pointer hover:text-foreground">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                            </svg>
+                        </span>
+                    </div>
+                    <span className={`text-[10px] px-2 py-0.5 rounded font-medium uppercase tracking-wide ${flow.isActive
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-orange-100 text-orange-700'
                         }`}>
                         {flow.isActive ? 'Active' : 'Draft'}
                     </span>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center text-sm text-muted-foreground mr-4">
+                        <span className="flex items-center text-green-600 mr-4">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mr-1">
+                                <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Saved
+                        </span>
+                        <div className="flex gap-1">
+                            <button 
+                                className="p-1 hover:bg-gray-100 rounded active:bg-gray-200 transition-colors" 
+                                onClick={() => editorRef.current?.undo()}
+                                title="Undo (Ctrl+Z)"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 14L4 9l5-5" />
+                                    <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+                                </svg>
+                            </button>
+                            <button 
+                                className="p-1 hover:bg-gray-100 rounded active:bg-gray-200 transition-colors" 
+                                onClick={() => editorRef.current?.redo()}
+                                title="Redo (Ctrl+Y)"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: 'scaleX(-1)' }}>
+                                    <path d="M9 14L4 9l5-5" />
+                                    <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center border rounded-lg overflow-hidden">
+                        <Button variant="ghost" size="sm" className="h-9 px-3 border-r rounded-none gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                                <line x1="12" y1="18" x2="12.01" y2="18" />
+                            </svg>
+                            Preview
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-9 px-2 rounded-none hover:bg-gray-50">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </Button>
+                    </div>
+
                     <Button 
                         onClick={handleSave} 
                         disabled={updateFlow.isPending}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-6"
                     >
                         {updateFlow.isPending ? (
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                            <Save className="w-4 h-4 mr-2" />
-                        )}
-                        Save
+                        ) : null}
+                        Set Live
+                    </Button>
+
+                    <Button variant="outline" size="sm" className="h-9 w-9 p-0">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="1" />
+                            <circle cx="12" cy="5" r="1" />
+                            <circle cx="12" cy="19" r="1" />
+                        </svg>
                     </Button>
                 </div>
             </div>
@@ -96,7 +160,7 @@ export default function FlowBuilderPage({ params }: { params: { id: string } }) 
                     </TabsContent>
                     
                     <TabsContent value="logs" className="flex-1 h-full mt-0 p-6 overflow-auto">
-                        <FlowLogs flowId={params.id} />
+                        <FlowLogs flowId={id} />
                     </TabsContent>
                 </Tabs>
             </div>

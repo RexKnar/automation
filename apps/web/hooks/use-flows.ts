@@ -31,7 +31,7 @@ export const useCreateFlow = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (data: { name: string; workspaceId: string }) => {
+        mutationFn: async (data: { name: string; workspaceId: string; nodes?: any[]; edges?: any[] }) => {
             const response = await axios.post("/automation/flows", data);
             return response.data;
         },

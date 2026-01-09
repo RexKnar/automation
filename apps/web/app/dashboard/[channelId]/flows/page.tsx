@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Plus, MoreVertical, Play, Edit, Loader2, MessageCircle } from "lucide-react";
+import { Plus, MoreVertical, Play, Edit, Loader2, MessageCircle, Zap } from "lucide-react";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useFlows, useCreateFlow } from "@/hooks/use-flows";
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { AUTOMATION_TEMPLATES } from "@/lib/constants";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
     Dialog,
     DialogContent,
@@ -38,6 +41,7 @@ export default function ChannelFlowsPage() {
 
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [newFlowName, setNewFlowName] = useState("");
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
     // Auto-open create modal if no flows (optional interpretation of "take me to create new flow page")
     // For now, we'll just show the empty state which is clearer.
@@ -48,18 +52,117 @@ export default function ChannelFlowsPage() {
             toast.error("Flow name is required");
             return;
         }
+        if (!selectedTemplateId) {
+            toast.error("Please select a template");
+            return;
+        }
+
+        let nodes: any[] = [];
+        let edges: any[] = [];
+
+        if (selectedTemplateId === "auto-send-links") {
+            // Define nodes for "Auto-send links in DM"
+            nodes = [
+                {
+                    id: 'trigger',
+                    type: 'TRIGGER',
+                    position: { x: 100, y: 300 },
+                    data: { 
+                        label: 'Trigger',
+                        triggerType: 'KEYWORD',
+                        keywordType: 'specific',
+                        keywords: ['viral', 'video', 'viral video']
+                    }
+                },
+                {
+                    id: 'note_1',
+                    type: 'NOTE',
+                    position: { x: 100, y: 600 },
+                    data: {
+                        label: 'Your trigger here will be "User sends you a message". You can change these keywords to be anything you\'d like!'
+                    }
+                },
+                {
+                    id: 'note_2',
+                    type: 'NOTE',
+                    position: { x: 500, y: 150 },
+                    data: {
+                        label: 'This is the first message your follower receives with a Button that has a Link to your website.'
+                    }
+                },
+                {
+                    id: 'message_1',
+                    type: 'MESSAGE',
+                    position: { x: 500, y: 300 },
+                    data: {
+                        label: 'Send Message',
+                        content: "Hey! 👋\n\nHere's a link to the viral video system that will help you crack the code on your next IG Reel or TikTok video!\n\nWant to check it out?",
+                        buttons: [{ label: "Yes, please! 🔥", action: "next_step" }]
+                    }
+                },
+                {
+                    id: 'note_3',
+                    type: 'NOTE',
+                    position: { x: 900, y: 150 },
+                    data: {
+                        label: 'Make sure you update this button URL so it opens to your freebie PDF file!'
+                    }
+                },
+                {
+                    id: 'message_2',
+                    type: 'MESSAGE',
+                    position: { x: 900, y: 300 },
+                    data: {
+                        label: 'Send Message #3',
+                        content: "Here you go! Check out the link 👇",
+                        buttons: [{ label: "Get it here!", action: "link", url: "https://example.com" }],
+                        delay: "60 sec..."
+                    }
+                },
+                {
+                    id: 'message_3',
+                    type: 'MESSAGE',
+                    position: { x: 900, y: 700 }, // Placed below for visual flow
+                    data: {
+                        label: 'Message 3',
+                        content: "Did you have any questions about the video system? I'm here to help! ❤️"
+                    }
+                },
+                {
+                    id: 'note_4',
+                    type: 'NOTE',
+                    position: { x: 900, y: 900 },
+                    data: {
+                        label: "Here's your boop (aka your reminder after 1 minute). You can change the text!"
+                    }
+                }
+            ];
+
+            edges = [
+                { id: 'e1', source: 'trigger', target: 'message_1' },
+                { id: 'e2', source: 'message_1', target: 'message_2' },
+                { id: 'e3', source: 'message_2', target: 'message_3' }
+            ];
+        }
 
         try {
             const newFlow = await createFlow.mutateAsync({
                 name: newFlowName,
                 workspaceId: currentWorkspace.id,
+                nodes,
+                edges
             });
             toast.success("Flow created successfully");
             setIsCreateOpen(false);
             setNewFlowName("");
+            setSelectedTemplateId(null);
             
-            if (channelId) {
-                router.push(`/dashboard/${channelId}/automations/${newFlow.id}/edit`);
+            if (selectedTemplateId === "auto-send-links") {
+                router.push(`/dashboard/flows/${newFlow.id}`); // Visual Builder
+            } else {
+                if (channelId) {
+                    router.push(`/dashboard/${channelId}/automations/${newFlow.id}/edit`);
+                }
             }
         } catch (error) {
             toast.error("Failed to create flow");
@@ -93,6 +196,10 @@ export default function ChannelFlowsPage() {
                     </p>
                 </div>
                 
+
+
+    // ... render ...
+
                 <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                     <DialogTrigger asChild>
                         <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
@@ -100,25 +207,58 @@ export default function ChannelFlowsPage() {
                             Create Flow
                         </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                             <DialogTitle>Create New Flow</DialogTitle>
                             <DialogDescription>
-                                Give your automation flow a name to get started.
+                                Give your automation flow a name and choose a template to get started.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="name" className="text-right">
+                        <div className="grid gap-6 py-4">
+                            <div className="grid gap-2">
+                                <Label htmlFor="name">
                                     Name
                                 </Label>
                                 <Input
                                     id="name"
                                     value={newFlowName}
                                     onChange={(e) => setNewFlowName(e.target.value)}
-                                    className="col-span-3"
                                     placeholder="e.g., Welcome Message"
                                 />
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Choose a Template</Label>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {AUTOMATION_TEMPLATES.map((template) => (
+                                        <Card 
+                                            key={template.id}
+                                            className={`cursor-pointer transition-all hover:shadow-md border-2 ${selectedTemplateId === template.id ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-transparent hover:border-indigo-200'}`}
+                                            onClick={() => setSelectedTemplateId(template.id)}
+                                        >
+                                            <div className="p-4 flex flex-col h-full">
+                                                <div className="flex items-start justify-between mb-2">
+                                                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
+                                                        <template.icon className="w-5 h-5" />
+                                                    </div>
+                                                    {template.tag && (
+                                                        <Badge variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-200 border-none text-[10px]">
+                                                            {template.tag}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <h3 className="font-semibold text-sm mb-1">{template.title}</h3>
+                                                <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+                                                    {template.description}
+                                                </p>
+                                                <div className="mt-auto flex items-center text-[10px] text-muted-foreground font-medium">
+                                                    <Zap className="w-3 h-3 mr-1" />
+                                                    {template.type}
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                         <DialogFooter>
@@ -127,7 +267,7 @@ export default function ChannelFlowsPage() {
                             </Button>
                             <Button onClick={handleCreateFlow} disabled={createFlow.isPending}>
                                 {createFlow.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                                Create
+                                Create Flow
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -155,8 +295,11 @@ export default function ChannelFlowsPage() {
                         const postId = triggerNode?.data?.postId;
                         const media = postId ? mediaItems?.find((m: any) => m.id === postId) : null;
                         
+                        const isVisualFlow = flow.nodes?.some((n: any) => n.type === 'DELAY');
                         const flowUrl = `/dashboard/${channelId}/automations/${flow.id}`;
-                        const editUrl = `/dashboard/${channelId}/automations/${flow.id}/edit`;
+                        const editUrl = isVisualFlow
+                            ? `/dashboard/flows/${flow.id}`
+                            : `/dashboard/${channelId}/automations/${flow.id}/edit`;
 
                         return (
                             <div 
