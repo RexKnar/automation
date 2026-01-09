@@ -288,9 +288,7 @@ export default function FlowsPage() {
                                 ? `/dashboard/${defaultChannelId}/automations/${flow.id}/edit` 
                                 : '#');
 
-                                const editUrlNew = isVisualFlow
-                            ? `/dashboard/flows/${flow.id}`
-                            : `${flow.id}`;
+                                
 
                         return (
                             <div 
@@ -346,7 +344,7 @@ export default function FlowsPage() {
                                             Insights <BarChart className="w-3 h-3 ml-1" />
                                         </Link>
                                         <Link 
-                                            href={editUrlNew} 
+                                            href={editUrl} 
                                             className="text-sm font-medium text-indigo-600 hover:text-indigo-500 flex items-center px-3 py-1 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
                                             onClick={(e) => e.stopPropagation()}
                                         >
