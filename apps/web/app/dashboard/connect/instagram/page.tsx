@@ -9,7 +9,9 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
-export default function ConnectInstagramPage() {
+import { Suspense } from "react";
+
+function ConnectInstagramContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
@@ -124,5 +126,13 @@ export default function ConnectInstagramPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ConnectInstagramPage() {
+  return (
+    <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>}>
+      <ConnectInstagramContent />
+    </Suspense>
   );
 }
