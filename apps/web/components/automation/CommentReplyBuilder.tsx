@@ -269,13 +269,6 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                 </div>
               </div>
 
-              <div className={`flex items-center space-x-3 p-3 rounded-lg border-2 transition-colors ${triggerType === 'next' ? 'border-blue-600 bg-blue-50/50' : 'border-transparent hover:bg-muted/50'}`}>
-                <RadioGroupItem value="next" id="next" />
-                <div className="flex-1 flex items-center justify-between">
-                    <Label htmlFor="next" className="font-medium cursor-pointer">next post or reel</Label>
-                    <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">PRO</span>
-                </div>
-              </div>
             </RadioGroup>
           </section>
 
@@ -428,13 +421,7 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                 )}
             </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-card">
-              <div className="flex items-center gap-2">
-                  <Label htmlFor="follow-up" className="font-medium">a follow up DM if they don't click the link</Label>
-                  <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">PRO</span>
-              </div>
-              <Switch id="follow-up" checked={followUpDM} onCheckedChange={setFollowUpDM} />
-            </div>
+            
           </section>
         </div>
 
