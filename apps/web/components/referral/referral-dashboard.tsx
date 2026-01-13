@@ -14,20 +14,34 @@ export function ReferralDashboard() {
   const [referralCode, setReferralCode] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const [baseUrl, setBaseUrl] = useState("");
+
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      setBaseUrl(window.location.origin);
+    }
     fetchReferralData();
   }, []);
 
   const fetchReferralData = async () => {
     try {
-      const [statsRes, historyRes, userRes] = await Promise.all([
-        axiosInstance.get("/referrals/stats"),
-        axiosInstance.get("/referrals/history"),
-        axiosInstance.get("/users/me"),
+      // Fetch user data first to ensure we get the referral code
+      try {
+        const userRes = await axiosInstance.get("/users/me");
+        setReferralCode(userRes.data.referralCode || "Generating...");
+      } catch (error) {
+        console.error("Failed to fetch user data", error);
+      }
+
+      // Fetch stats and history independently so one failure doesn't break everything
+      const [statsRes, historyRes] = await Promise.all([
+        axiosInstance.get("/referrals/stats").catch(() => ({ data: { total: 0, completed: 0, pending: 0, earnings: 0 } })),
+        axiosInstance.get("/referrals/history").catch(() => ({ data: [] })),
       ]);
-      setStats(statsRes.data);
-      setHistory(historyRes.data);
-      setReferralCode(userRes.data.referralCode || "Generating...");
+
+      if (statsRes?.data) setStats(statsRes.data);
+      if (historyRes?.data) setHistory(historyRes.data);
+      
     } catch (error) {
       console.error("Failed to fetch referral data", error);
     } finally {
@@ -35,8 +49,10 @@ export function ReferralDashboard() {
     }
   };
 
+  const referralLink = `${baseUrl}/signup?ref=${referralCode}`;
+
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(`https://app.example.com/signup?ref=${referralCode}`);
+    navigator.clipboard.writeText(referralLink);
     toast.success("Referral link copied!");
   };
 
@@ -56,7 +72,7 @@ export function ReferralDashboard() {
           <div className="flex space-x-2">
             <Input 
               readOnly 
-              value={`https://app.example.com/signup?ref=${referralCode}`} 
+              value={referralLink} 
               className="bg-gray-800 border-gray-700 text-gray-300"
             />
             <Button onClick={copyToClipboard} className="bg-blue-600 hover:bg-blue-700">

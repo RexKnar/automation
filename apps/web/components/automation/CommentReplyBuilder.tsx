@@ -421,7 +421,6 @@ export function CommentReplyBuilder({ initialData, onSave, isSaving, channelId, 
                 )}
             </div>
 
-            
           </section>
         </div>
 

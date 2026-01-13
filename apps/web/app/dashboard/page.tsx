@@ -67,24 +67,6 @@ export default function DashboardPage() {
             >
                 Accounts
             </TabsTrigger>
-            <TabsTrigger 
-                value="templates" 
-                className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-0 py-4 text-base font-medium text-muted-foreground data-[state=active]:text-foreground bg-transparent"
-            >
-                My Templates
-            </TabsTrigger>
-            <TabsTrigger 
-                value="api" 
-                className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-0 py-4 text-base font-medium text-muted-foreground data-[state=active]:text-foreground bg-transparent"
-            >
-                API Settings
-            </TabsTrigger>
-            <TabsTrigger 
-                value="reports" 
-                className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:shadow-none rounded-none px-0 py-4 text-base font-medium text-muted-foreground data-[state=active]:text-foreground bg-transparent"
-            >
-                Message reports
-            </TabsTrigger>
             </TabsList>
         </div>
 
@@ -168,15 +150,7 @@ export default function DashboardPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="templates">
-          <div className="p-4 text-center text-muted-foreground">My Templates Content</div>
-        </TabsContent>
-        <TabsContent value="api">
-          <div className="p-4 text-center text-muted-foreground">API Settings Content</div>
-        </TabsContent>
-        <TabsContent value="reports">
-          <div className="p-4 text-center text-muted-foreground">Message Reports Content</div>
-        </TabsContent>
+  
       </Tabs>
     </div>
   );
