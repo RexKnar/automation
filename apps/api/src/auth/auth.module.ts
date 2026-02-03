@@ -6,11 +6,11 @@ import { MailService } from './mail.service';
 import { PrismaModule } from '../prisma/prisma.module';
 
 import { JwtModule } from '@nestjs/jwt';
-import { AtStrategy, RtStrategy } from './strategies';
+import { AtStrategy, RtStrategy, FacebookStrategy } from './strategies';
 
 @Module({
     imports: [PrismaModule, JwtModule.register({})],
     controllers: [AuthController],
-    providers: [AuthService, AtStrategy, RtStrategy, MailService],
+    providers: [AuthService, AtStrategy, RtStrategy, FacebookStrategy, MailService],
 })
 export class AuthModule { }

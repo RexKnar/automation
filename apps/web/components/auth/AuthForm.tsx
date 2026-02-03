@@ -16,7 +16,7 @@ export function AuthForm({ type }: AuthFormProps) {
   const isLogin = type === "login"
   const loginMutation = useLogin()
   const signupMutation = useSignup()
-  
+
   const mutation = isLogin ? loginMutation : signupMutation
   const isLoading = mutation.isPending
   const error = mutation.error?.message || ""
@@ -43,14 +43,14 @@ export function AuthForm({ type }: AuthFormProps) {
           {isLogin ? "Welcome back" : "Create an account"}
         </CardTitle>
         <CardDescription className="text-center">
-          {isLogin 
-            ? "Enter your email to sign in to your account" 
+          {isLogin
+            ? "Enter your email to sign in to your account"
             : "Enter your email below to create your account"}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
         <div className="grid grid-cols-2 gap-6">
-          <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10">
+          <Button variant="outline" className="bg-white/5 border-white/10 hover:bg-white/10" onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/facebook`}>
             <Facebook className="mr-2 h-4 w-4" />
             Facebook
           </Button>
@@ -74,7 +74,7 @@ export function AuthForm({ type }: AuthFormProps) {
         <form onSubmit={onSubmit} className="grid gap-4">
           {error && <div className="text-red-500 text-sm text-center">{error}</div>}
           {!isLogin && (
-             <div className="grid gap-2">
+            <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" name="name" type="text" placeholder="John Doe" className="bg-white/5 border-white/10" required />
             </div>

@@ -3,9 +3,14 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/update-user.dto';
 
+import { ReferralService } from '../referral/referral.service';
+
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private referralService: ReferralService,
+  ) { }
 
   async findAll() {
     const users = await this.prisma.user.findMany();
@@ -20,6 +25,17 @@ export class UsersService {
       where: { id },
     });
     if (user) {
+      // Lazy generation of referral code
+      if (!user.referralCode) {
+        const referralCode = await this.referralService.generateReferralCode();
+        const updatedUser = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { referralCode },
+        });
+        const { passwordHash, ...result } = updatedUser;
+        return result;
+      }
+
       const { passwordHash, ...result } = user;
       return result;
     }

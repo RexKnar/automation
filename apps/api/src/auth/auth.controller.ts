@@ -6,8 +6,10 @@ import {
     Post,
     Req,
     Res,
+    Get,
     UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { GetCurrentUser } from '../common/decorators';
 import { AtGuard, RtGuard } from '../common/guards';
@@ -68,6 +70,25 @@ export class AuthController {
     @HttpCode(HttpStatus.OK)
     async resendVerification(@GetCurrentUser('sub') userId: string) {
         return this.authService.resendVerificationEmail(userId);
+    }
+
+    @UseGuards(AuthGuard('facebook'))
+    @Get('facebook')
+    @HttpCode(HttpStatus.OK)
+    async facebookLogin() {
+        // Initiates the Facebook OAuth flow
+    }
+
+    @UseGuards(AuthGuard('facebook'))
+    @Get('facebook/callback')
+    @HttpCode(HttpStatus.OK)
+    async facebookLoginCallback(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+        const tokens = await this.authService.handleFacebookLogin(req.user);
+        this.setRefreshTokenCookie(res, tokens.refresh_token);
+        // Redirect to frontend with access token
+        // Using a temporary redirect page or passing via query param
+        // Security note: passing token in query param is not ideal but common for social auth redirect
+        res.redirect(`${process.env.FRONTEND_URL}/social-callback?token=${tokens.access_token}`);
     }
 
     private setRefreshTokenCookie(res: Response, token: string) {

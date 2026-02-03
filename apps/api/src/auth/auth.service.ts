@@ -184,4 +184,65 @@ export class AuthService {
         await this.mailService.sendVerificationEmail(user.email, verificationToken);
         return { message: 'Verification email sent' };
     }
+
+    async handleFacebookLogin(user: any) {
+        if (!user.email) {
+            throw new ForbiddenException('Email not found from Facebook provider');
+        }
+
+        let existingUser = await this.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { facebookId: user.facebookId },
+                    { email: user.email },
+                ],
+            },
+        });
+
+        if (!existingUser) {
+            // Create new user
+            const referralCode = `REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+            existingUser = await this.prisma.user.create({
+                data: {
+                    email: user.email,
+                    name: `${user.firstName} ${user.lastName}`,
+                    facebookId: user.facebookId,
+                    avatarUrl: user.picture,
+                    emailVerified: new Date(), // Facebook emails are verified
+                    referralCode,
+                },
+            });
+
+            // Create default workspace
+            const workspaceName = `${existingUser.name}'s Workspace`;
+            const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000);
+            const wsReferralCode = `WS-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+            await (this.prisma as any).workspace.create({
+                data: {
+                    name: workspaceName,
+                    slug: slug,
+                    referralCode: wsReferralCode,
+                    members: {
+                        create: {
+                            userId: existingUser.id,
+                            role: 'OWNER',
+                        },
+                    },
+                },
+            });
+        } else {
+            // Update existing user if facebookId is missing
+            if (!existingUser.facebookId) {
+                await this.prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: { facebookId: user.facebookId, avatarUrl: existingUser.avatarUrl || user.picture },
+                });
+            }
+        }
+
+        const tokens = await this.getTokens(existingUser.id, existingUser.email);
+        await this.updateRtHash(existingUser.id, tokens.refresh_token);
+        return tokens;
+    }
 }

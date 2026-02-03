@@ -23,6 +23,7 @@ model User {
   emailVerified     DateTime?
   verificationToken String?
   referralCode      String?    @unique
+  facebookId        String?    @unique
 
   createdAt    DateTime   @default(now())
 
