@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
-export default function SocialCallbackPage() {
+function SocialCallbackContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
@@ -29,11 +29,26 @@ export default function SocialCallbackPage() {
     }, [searchParams, router])
 
     return (
+        <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Authenticating...</p>
+        </div>
+    )
+}
+
+export default function SocialCallbackPage() {
+    return (
         <div className="flex items-center justify-center min-h-screen bg-black text-white">
-            <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-muted-foreground">Authenticating...</p>
-            </div>
+            <Suspense
+                fallback={
+                    <div className="flex flex-col items-center gap-4">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                }
+            >
+                <SocialCallbackContent />
+            </Suspense>
         </div>
     )
 }
