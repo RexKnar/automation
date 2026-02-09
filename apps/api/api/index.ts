@@ -1,3 +1,4 @@
+
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
@@ -6,12 +7,14 @@ import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 
-const server = express();
+// Use a cached server to prevent re-initialization on every request
+// but ensure it's ready before handling the request.
+let cachedServer: any;
 
-const createNestServer = async (expressInstance) => {
+const bootstrap = async (serverInstance: any) => {
     const app = await NestFactory.create(
         AppModule,
-        new ExpressAdapter(expressInstance),
+        new ExpressAdapter(serverInstance),
     );
 
     app.use(helmet());
@@ -30,7 +33,7 @@ const createNestServer = async (expressInstance) => {
                 callback(null, true);
             } else {
                 console.log('Blocked CORS origin:', requestOrigin);
-                callback(null, false); // Or callback(new Error('Not allowed by CORS'))
+                callback(null, false);
             }
         },
         credentials: true,
@@ -45,10 +48,14 @@ const createNestServer = async (expressInstance) => {
     }));
 
     await app.init();
+    return serverInstance;
 };
 
-createNestServer(server)
-    .then(() => console.log('NestJS Server initialized'))
-    .catch((err) => console.error('NestJS Server failed to start', err));
+export default async function handler(req: any, res: any) {
+    if (!cachedServer) {
+        const server = express();
+        cachedServer = await bootstrap(server);
+    }
 
-export default server;
+    return cachedServer(req, res);
+}
